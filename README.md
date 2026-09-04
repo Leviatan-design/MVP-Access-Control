@@ -155,3 +155,4 @@ Puedes probar en el panel de garita con estos códigos precargados:
 ## Licencia
 
 Proyecto demo — uso libre para pruebas y demostraciones.
+# MVP-Access-Control
