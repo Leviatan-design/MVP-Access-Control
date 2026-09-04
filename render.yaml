@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: access-control-residencial
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: DATA_DIR
+        value: /app/data
+      - key: PORT
+        value: 8080

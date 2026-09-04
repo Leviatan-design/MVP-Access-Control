@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}Panel Propietario | Control de Acceso{% endblock %}
+
+{% block head %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="grid lg:grid-cols-2 gap-8">
+  <section class="bg-white rounded-2xl shadow-lg border border-slate-100 p-6">
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <h2 class="text-2xl font-bold">Panel Propietario</h2>
+        <p class="text-slate-500 text-sm">Agenda visitas y genera pases de acceso</p>
+      </div>
+      <span class="px-3 py-1 rounded-full bg-brand-100 text-brand-800 text-sm font-medium">Demo sin login</span>
+    </div>
+
+    <form method="get" action="/owner" class="mb-6">
+      <label class="block text-sm font-medium text-slate-700 mb-2">Seleccionar propiedad</label>
+      <select name="property_id" onchange="this.form.submit()"
+              class="w-full rounded-xl border border-slate-300 px-4 py-3 focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+        {% for prop in properties %}
+        <option value="{{ prop.id }}" {% if prop.id == selected_property.id %}selected{% endif %}>
+          {{ prop.name }} ({{ prop.unit }}) — {{ prop.owner_name }}
+        </option>
+        {% endfor %}
+      </select>
+    </form>
+
+    <form method="post" action="/owner/visits" class="space-y-4">
+      <input type="hidden" name="property_id" value="{{ selected_property.id }}">
+
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Nombre del visitante</label>
+        <input type="text" name="visitor_name" required placeholder="Ej. Juan Pérez"
+               class="w-full rounded-xl border border-slate-300 px-4 py-3 focus:ring-2 focus:ring-brand-500">
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Cédula / ID</label>
+        <input type="text" name="visitor_id" required placeholder="Ej. V-12345678"
+               class="w-full rounded-xl border border-slate-300 px-4 py-3 focus:ring-2 focus:ring-brand-500">
+      </div>
+
+      <div class="grid sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Tipo de acceso</label>
+          <select name="access_type" required
+                  class="w-full rounded-xl border border-slate-300 px-4 py-3 focus:ring-2 focus:ring-brand-500">
+            <option value="peatonal">Peatonal</option>
+            <option value="vehicular">Vehicular</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Fecha y hora estimada</label>
+          <input type="datetime-local" name="scheduled_at" required value="{{ now_iso }}"
+                 class="w-full rounded-xl border border-slate-300 px-4 py-3 focus:ring-2 focus:ring-brand-500">
+        </div>
+      </div>
+
+      <button type="submit"
+              class="w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold py-3 rounded-xl transition shadow-md">
+        Generar pase de acceso
+      </button>
+    </form>
+  </section>
+
+  <section class="space-y-6">
+    <div id="pass-card" class="hidden bg-gradient-to-br from-brand-700 to-brand-900 text-white rounded-2xl shadow-xl p-6">
+      <p class="text-brand-100 text-sm uppercase tracking-widest mb-2">Pase generado</p>
+      <h3 class="text-2xl font-bold mb-1" id="pass-visitor"></h3>
+      <p class="text-brand-100 mb-4" id="pass-details"></p>
+      <div class="bg-white rounded-xl p-4 flex flex-col items-center">
+        <p class="text-3xl font-black text-brand-900 tracking-widest mb-3" id="pass-code"></p>
+        <div id="qrcode" class="p-2 bg-white rounded-lg"></div>
+      </div>
+      <p class="text-brand-100 text-xs mt-4 text-center">Comparte este código o QR con tu visitante</p>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-lg border border-slate-100 p-6">
+      <h3 class="text-xl font-bold mb-4">Visitas agendadas</h3>
+      {% if visits %}
+      <div class="space-y-3 max-h-[32rem] overflow-y-auto">
+        {% for visit in visits %}
+        <article class="rounded-xl border border-slate-200 p-4 hover:border-brand-300 transition">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <p class="font-semibold">{{ visit.visitor_name }}</p>
+              <p class="text-sm text-slate-500">{{ visit.visitor_id }} · {{ visit.access_type.value|capitalize }}</p>
+              <p class="text-sm text-slate-500">{{ visit.scheduled_at.strftime('%d/%m/%Y %H:%M') }}</p>
+            </div>
+            <div class="text-right">
+              <span class="inline-block font-mono font-bold text-brand-700 bg-brand-50 px-2 py-1 rounded">{{ visit.code }}</span>
+              <p class="text-xs mt-1
+                {% if visit.status.value == 'scheduled' %}text-amber-600
+                {% elif visit.status.value == 'inside' %}text-emerald-600
+                {% elif visit.status.value == 'exited' %}text-slate-500
+                {% else %}text-red-600{% endif %}">
+                {% if visit.status.value == 'scheduled' %}Agendada
+                {% elif visit.status.value == 'inside' %}Dentro
+                {% elif visit.status.value == 'exited' %}Salió
+                {% else %}Cancelada{% endif %}
+              </p>
+            </div>
+          </div>
+        </article>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-slate-500 text-sm">No hay visitas registradas para esta propiedad.</p>
+      {% endif %}
+    </div>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    const params = new URLSearchParams(window.location.search);
+    const createdCode = params.get('created');
+    if (!createdCode) return;
+
+    fetch('/api/visits/search?code=' + encodeURIComponent(createdCode))
+      .then(function (res) {
+        if (!res.ok) throw new Error('No se pudo cargar el pase');
+        return res.json();
+      })
+      .then(function (visit) {
+        document.getElementById('pass-card').classList.remove('hidden');
+        document.getElementById('pass-visitor').textContent = visit.visitor_name;
+        document.getElementById('pass-details').textContent =
+          visit.access_type_label + ' · ' + visit.scheduled_at_display + ' · ' + visit.property_name;
+        document.getElementById('pass-code').textContent = visit.code;
+
+        new QRCode(document.getElementById('qrcode'), {
+          text: visit.code,
+          width: 180,
+          height: 180,
+          colorDark: '#1e3a8a',
+          colorLight: '#ffffff',
+          correctLevel: QRCode.CorrectLevel.H
+        });
+
+        document.getElementById('pass-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      })
+      .catch(function () {
+        console.error('Error al mostrar el pase generado');
+      });
+  })();
+</script>
+{% endblock %}

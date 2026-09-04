@@ -1,0 +1,280 @@
+{% extends "base.html" %}
+
+{% block title %}Panel Garita | Control de Acceso{% endblock %}
+
+{% block head %}
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+  #qr-reader { border: none !important; }
+  #qr-reader__dashboard_section_csr button {
+    font-size: 1rem !important;
+    padding: 0.75rem 1.25rem !important;
+    border-radius: 0.75rem !important;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+  <div>
+    <h2 class="text-3xl font-black text-emerald-900">Panel de Garita</h2>
+    <p class="text-slate-600">Vista optimizada para tablet — actualización automática cada 15 segundos</p>
+  </div>
+  <span class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-100 text-emerald-800 font-semibold">
+    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+    En vivo
+  </span>
+</div>
+
+<section class="grid xl:grid-cols-3 gap-6 mb-8">
+  <div class="xl:col-span-2 bg-white rounded-2xl shadow-lg border-2 border-slate-200 p-6">
+    <h3 class="text-xl font-bold mb-4">Buscar visitante</h3>
+    <div class="flex flex-col sm:flex-row gap-3 mb-4">
+      <input id="search-code" type="text" placeholder="Código ej. ACC-902"
+             class="flex-1 text-2xl font-mono uppercase tracking-widest rounded-xl border-2 border-slate-300 px-4 py-4 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+      <button id="search-btn"
+              class="bg-emerald-600 hover:bg-emerald-700 text-white text-lg font-bold px-8 py-4 rounded-xl transition">
+        Buscar
+      </button>
+    </div>
+    <div id="search-result" class="hidden rounded-xl border-2 border-emerald-200 bg-emerald-50 p-5"></div>
+  </div>
+
+  <div class="bg-slate-900 rounded-2xl shadow-lg p-4 text-white">
+    <h3 class="text-lg font-bold mb-3 px-2">Escanear QR</h3>
+    <div id="qr-reader" class="rounded-xl overflow-hidden bg-black/30"></div>
+    <button id="toggle-scanner"
+            class="mt-3 w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl transition">
+      Activar cámara
+    </button>
+  </div>
+</section>
+
+<div class="grid lg:grid-cols-2 gap-6">
+  <section class="bg-white rounded-2xl shadow-lg border-2 border-amber-200 p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-2xl font-bold text-amber-900">Esperados hoy</h3>
+      <span id="expected-count" class="text-3xl font-black text-amber-600">{{ expected_visits|length }}</span>
+    </div>
+    <div id="expected-list" class="space-y-3">
+      {% for visit in expected_visits %}
+      <article class="visit-card rounded-xl border-2 border-amber-100 bg-amber-50 p-4" data-visit-id="{{ visit.id }}">
+        <div class="flex justify-between items-start gap-3">
+          <div>
+            <p class="text-lg font-bold">{{ visit.visitor_name }}</p>
+            <p class="text-slate-600">{{ visit.property.name }} ({{ visit.property.unit }})</p>
+            <p class="text-sm text-slate-500">{{ visit.scheduled_at.strftime('%H:%M') }} · {{ visit.access_type.value|capitalize }}</p>
+          </div>
+          <span class="font-mono text-xl font-black text-amber-800">{{ visit.code }}</span>
+        </div>
+        <div class="mt-4 flex gap-3">
+          {% if visit.status.value == 'scheduled' %}
+          <button onclick="markEntry({{ visit.id }})"
+                  class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-lg font-bold py-3 rounded-xl transition">
+            Marcar Entrada
+          </button>
+          {% else %}
+          <button onclick="markExit({{ visit.id }})"
+                  class="flex-1 bg-red-600 hover:bg-red-700 text-white text-lg font-bold py-3 rounded-xl transition">
+            Marcar Salida
+          </button>
+          {% endif %}
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="bg-white rounded-2xl shadow-lg border-2 border-emerald-200 p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-2xl font-bold text-emerald-900">Dentro del conjunto</h3>
+      <span id="inside-count" class="text-3xl font-black text-emerald-600">{{ inside_visits|length }}</span>
+    </div>
+    <div id="inside-list" class="space-y-3">
+      {% for visit in inside_visits %}
+      <article class="visit-card rounded-xl border-2 border-emerald-100 bg-emerald-50 p-4" data-visit-id="{{ visit.id }}">
+        <div class="flex justify-between items-start gap-3">
+          <div>
+            <p class="text-lg font-bold">{{ visit.visitor_name }}</p>
+            <p class="text-slate-600">{{ visit.property.name }} ({{ visit.property.unit }})</p>
+            <p class="text-sm text-slate-500">
+              Entrada: {{ visit.entry_at.strftime('%H:%M') if visit.entry_at else '—' }}
+            </p>
+          </div>
+          <span class="font-mono text-xl font-black text-emerald-800">{{ visit.code }}</span>
+        </div>
+        <div class="mt-4">
+          <button onclick="markExit({{ visit.id }})"
+                  class="w-full bg-red-600 hover:bg-red-700 text-white text-lg font-bold py-3 rounded-xl transition">
+            Marcar Salida
+          </button>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+</div>
+
+<div id="toast" class="fixed bottom-6 right-6 hidden px-5 py-4 rounded-xl shadow-2xl text-white font-semibold z-50"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  let scanner = null;
+  let scannerActive = false;
+
+  function showToast(message, ok) {
+    const toast = document.getElementById('toast');
+    toast.textContent = message;
+    toast.className = 'fixed bottom-6 right-6 px-5 py-4 rounded-xl shadow-2xl text-white font-semibold z-50 ' +
+      (ok ? 'bg-emerald-600' : 'bg-red-600');
+    toast.classList.remove('hidden');
+    setTimeout(function () { toast.classList.add('hidden'); }, 3000);
+  }
+
+  function statusLabel(status) {
+    return { scheduled: 'Agendada', inside: 'Dentro', exited: 'Salió', cancelled: 'Cancelada' }[status] || status;
+  }
+
+  function renderVisitActions(visit) {
+    if (visit.status === 'scheduled') {
+      return '<button onclick="markEntry(' + visit.id + ')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-lg font-bold py-3 rounded-xl transition">Marcar Entrada</button>';
+    }
+    if (visit.status === 'inside') {
+      return '<button onclick="markExit(' + visit.id + ')" class="flex-1 bg-red-600 hover:bg-red-700 text-white text-lg font-bold py-3 rounded-xl transition">Marcar Salida</button>';
+    }
+    return '<span class="text-sm text-slate-500">' + statusLabel(visit.status) + '</span>';
+  }
+
+  function renderExpectedCard(visit) {
+    return '<article class="visit-card rounded-xl border-2 border-amber-100 bg-amber-50 p-4" data-visit-id="' + visit.id + '">' +
+      '<div class="flex justify-between items-start gap-3">' +
+      '<div><p class="text-lg font-bold">' + visit.visitor_name + '</p>' +
+      '<p class="text-slate-600">' + visit.property_name + ' (' + visit.property_unit + ')</p>' +
+      '<p class="text-sm text-slate-500">' + visit.scheduled_at_display.split(' ')[1] + ' · ' + visit.access_type_label + '</p></div>' +
+      '<span class="font-mono text-xl font-black text-amber-800">' + visit.code + '</span></div>' +
+      '<div class="mt-4 flex gap-3">' + renderVisitActions(visit) + '</div></article>';
+  }
+
+  function renderInsideCard(visit) {
+    return '<article class="visit-card rounded-xl border-2 border-emerald-100 bg-emerald-50 p-4" data-visit-id="' + visit.id + '">' +
+      '<div class="flex justify-between items-start gap-3">' +
+      '<div><p class="text-lg font-bold">' + visit.visitor_name + '</p>' +
+      '<p class="text-slate-600">' + visit.property_name + ' (' + visit.property_unit + ')</p>' +
+      '<p class="text-sm text-slate-500">Entrada: ' + (visit.entry_at_display ? visit.entry_at_display.split(' ')[1] : '—') + '</p></div>' +
+      '<span class="font-mono text-xl font-black text-emerald-800">' + visit.code + '</span></div>' +
+      '<div class="mt-4"><button onclick="markExit(' + visit.id + ')" class="w-full bg-red-600 hover:bg-red-700 text-white text-lg font-bold py-3 rounded-xl transition">Marcar Salida</button></div></article>';
+  }
+
+  function renderSearchResult(visit) {
+    const box = document.getElementById('search-result');
+    box.classList.remove('hidden');
+    box.innerHTML =
+      '<p class="text-sm uppercase tracking-widest text-emerald-700 font-semibold mb-2">Resultado</p>' +
+      '<p class="text-2xl font-bold">' + visit.visitor_name + '</p>' +
+      '<p class="text-slate-600">' + visit.property_name + ' · ' + visit.access_type_label + '</p>' +
+      '<p class="font-mono text-3xl font-black text-emerald-900 my-3">' + visit.code + '</p>' +
+      '<p class="text-sm mb-4">Estado: <strong>' + visit.status_label + '</strong></p>' +
+      '<div class="flex gap-3">' + renderVisitActions(visit) + '</div>';
+  }
+
+  async function searchByCode(rawCode) {
+    const code = (rawCode || '').trim().toUpperCase();
+    if (!code) {
+      showToast('Ingresa un código de acceso', false);
+      return;
+    }
+    const res = await fetch('/api/visits/search?code=' + encodeURIComponent(code));
+    if (!res.ok) {
+      document.getElementById('search-result').classList.add('hidden');
+      showToast('Código no encontrado', false);
+      return;
+    }
+    const visit = await res.json();
+    renderSearchResult(visit);
+    showToast('Visitante encontrado: ' + visit.visitor_name, true);
+  }
+
+  async function markEntry(id) {
+    const res = await fetch('/api/visits/' + id + '/entry', { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok) {
+      showToast(data.detail || 'No se pudo registrar la entrada', false);
+      return;
+    }
+    showToast('Entrada registrada: ' + data.visitor_name, true);
+    await refreshLists();
+  }
+
+  async function markExit(id) {
+    const res = await fetch('/api/visits/' + id + '/exit', { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok) {
+      showToast(data.detail || 'No se pudo registrar la salida', false);
+      return;
+    }
+    showToast('Salida registrada: ' + data.visitor_name, true);
+    await refreshLists();
+  }
+
+  async function refreshLists() {
+    const [expectedRes, insideRes] = await Promise.all([
+      fetch('/api/visits/today'),
+      fetch('/api/visits/inside')
+    ]);
+    const expected = await expectedRes.json();
+    const inside = await insideRes.json();
+
+    document.getElementById('expected-count').textContent = expected.length;
+    document.getElementById('inside-count').textContent = inside.length;
+    document.getElementById('expected-list').innerHTML = expected.length
+      ? expected.map(renderExpectedCard).join('')
+      : '<p class="text-slate-500">No hay visitas esperadas para hoy.</p>';
+    document.getElementById('inside-list').innerHTML = inside.length
+      ? inside.map(renderInsideCard).join('')
+      : '<p class="text-slate-500">No hay visitantes dentro del conjunto.</p>';
+  }
+
+  document.getElementById('search-btn').addEventListener('click', function () {
+    searchByCode(document.getElementById('search-code').value);
+  });
+
+  document.getElementById('search-code').addEventListener('keydown', function (event) {
+    if (event.key === 'Enter') searchByCode(event.target.value);
+  });
+
+  document.getElementById('toggle-scanner').addEventListener('click', async function () {
+    const btn = this;
+    if (scannerActive) {
+      if (scanner) await scanner.stop();
+      scannerActive = false;
+      btn.textContent = 'Activar cámara';
+      return;
+    }
+
+    if (!scanner) {
+      scanner = new Html5Qrcode('qr-reader');
+    }
+
+    btn.textContent = 'Detener cámara';
+    scannerActive = true;
+
+    try {
+      await scanner.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 220, height: 220 } },
+        function (decodedText) {
+          document.getElementById('search-code').value = decodedText.trim().toUpperCase();
+          searchByCode(decodedText);
+        }
+      );
+    } catch (err) {
+      scannerActive = false;
+      btn.textContent = 'Activar cámara';
+      showToast('No se pudo acceder a la cámara', false);
+    }
+  });
+
+  setInterval(refreshLists, 15000);
+</script>
+{% endblock %}

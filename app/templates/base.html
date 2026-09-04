@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Control de Acceso{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: { 50: '#eff6ff', 100: '#dbeafe', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8', 900: '#1e3a8a' },
+            guard: { 500: '#059669', 600: '#047857', 700: '#065f46' }
+          }
+        }
+      }
+    }
+  </script>
+  {% block head %}{% endblock %}
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-900">
+  <header class="bg-brand-900 text-white shadow-lg">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+      <div>
+        <p class="text-xs uppercase tracking-widest text-brand-100">MVP Demo</p>
+        <h1 class="text-xl font-bold">Control de Acceso Residencial</h1>
+      </div>
+      <nav class="flex gap-2 text-sm">
+        <a href="/" class="px-3 py-2 rounded-lg hover:bg-brand-700 transition">Inicio</a>
+        <a href="/owner" class="px-3 py-2 rounded-lg hover:bg-brand-700 transition">Propietario</a>
+        <a href="/guard" class="px-3 py-2 rounded-lg hover:bg-guard-700 transition">Garita</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 py-8">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="text-center text-sm text-slate-500 py-6">
+    Sistema de Control de Acceso Residencial &mdash; Demo
+  </footer>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>
