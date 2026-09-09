@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Vigilante - Access Pass</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        }
+        .large-input {
+            font-size: 2rem;
+            letter-spacing: 0.1em;
+        }
+        .pulse-animation {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <!-- Barra de estado de conexión -->
+    <div id="connection-status" class="hidden fixed top-0 left-0 right-0 bg-red-600 text-white text-center py-2 font-bold z-50">
+        ⚠️ Sin conexión a internet - Funcionalidad limitada
+    </div>
+
+    <div class="container mx-auto px-4 py-6 max-w-6xl">
+        <!-- Header -->
+        <header class="bg-blue-900 text-white rounded-lg shadow-lg p-6 mb-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold">Panel de Vigilante</h1>
+                    <p class="text-blue-200 mt-1">Control de Acceso - Access Pass</p>
+                </div>
+                <div class="text-right">
+                    <div id="current-time" class="text-2xl font-mono">--:--:--</div>
+                    <div id="current-date" class="text-blue-200 text-sm">--/--/----</div>
+                </div>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Panel principal de búsqueda -->
+            <div class="lg:col-span-2">
+                <!-- Búsqueda de pase -->
+                <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                    <h2 class="text-xl font-bold text-gray-800 mb-4">Buscar Pase</h2>
+                    <div class="flex gap-4">
+                        <input
+                            type="text"
+                            id="codigo-input"
+                            placeholder="Ingrese código (ej: ACC-902)"
+                            class="large-input flex-1 border-4 border-gray-300 rounded-lg px-4 py-3 focus:border-blue-500 focus:outline-none uppercase text-center"
+                            maxlength="7"
+                            autocomplete="off"
+                        >
+                        <button
+                            id="buscar-btn"
+                            class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-lg text-xl transition-colors"
+                        >
+                            🔍 Buscar
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Tarjeta de resultado de búsqueda -->
+                <div id="pase-card" class="hidden bg-white rounded-lg shadow-lg p-6 mb-6">
+                    <div class="flex items-start justify-between mb-4">
+                        <div>
+                            <h3 class="text-2xl font-bold text-gray-800">Visitante Encontrado</h3>
+                            <div id="pase-codigo" class="text-lg text-blue-600 font-mono mt-1">ACC-902</div>
+                        </div>
+                        <div id="pase-estado" class="px-4 py-2 rounded-full text-lg font-bold bg-yellow-100 text-yellow-800">
+                            PENDIENTE
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <div class="text-sm text-gray-600 mb-1">Nombre</div>
+                            <div id="visitante-nombre" class="text-xl font-semibold text-gray-800">Juan Pérez</div>
+                        </div>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <div class="text-sm text-gray-600 mb-1">Cédula</div>
+                            <div id="visitante-cedula" class="text-xl font-semibold text-gray-800">V-12345678</div>
+                        </div>
+                        <div class="bg-gray-50 p-4 rounded-lg col-span-2">
+                            <div class="text-sm text-gray-600 mb-1">Unidad</div>
+                            <div id="propiedad-unidad" class="text-xl font-semibold text-gray-800">A-12</div>
+                        </div>
+                    </div>
+
+                    <!-- Botones de acción -->
+                    <div class="flex gap-4">
+                        <button
+                            id="entrada-btn"
+                            class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-6 rounded-lg text-xl transition-colors"
+                        >
+                            ✅ Registrar Entrada
+                        </button>
+                        <button
+                            id="salida-btn"
+                            class="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-6 rounded-lg text-xl transition-colors"
+                        >
+                            🚪 Registrar Salida
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Mensaje de error -->
+                <div id="error-card" class="hidden bg-red-50 border-4 border-red-200 rounded-lg p-6 mb-6">
+                    <div class="flex items-center">
+                        <div class="text-4xl mr-4">❌</div>
+                        <div>
+                            <h3 class="text-xl font-bold text-red-800">Pase no encontrado</h3>
+                            <p id="error-message" class="text-red-600 mt-1">El código ingresado no existe o no está en estado PENDIENTE</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Mensaje de éxito -->
+                <div id="success-card" class="hidden bg-green-50 border-4 border-green-200 rounded-lg p-6 mb-6">
+                    <div class="flex items-center">
+                        <div class="text-4xl mr-4">✅</div>
+                        <div>
+                            <h3 class="text-xl font-bold text-green-800">Operación Exitosa</h3>
+                            <p id="success-message" class="text-green-600 mt-1">El acceso ha sido registrado correctamente</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Panel lateral de visitantes activos -->
+            <div class="lg:col-span-1">
+                <div class="bg-white rounded-lg shadow-lg p-6 sticky top-6">
+                    <h2 class="text-xl font-bold text-gray-800 mb-4">
+                        Visitantes Activos
+                        <span id="activos-count" class="bg-blue-600 text-white text-sm px-2 py-1 rounded-full ml-2">0</span>
+                    </h2>
+                    <div id="activos-list" class="space-y-3 max-h-96 overflow-y-auto">
+                        <div class="text-gray-500 text-center py-8">
+                            Cargando visitantes activos...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Estado de la aplicación
+        let currentPase = null;
+        let isOnline = navigator.onLine;
+
+        // Elementos del DOM
+        const connectionStatus = document.getElementById('connection-status');
+        const codigoInput = document.getElementById('codigo-input');
+        const buscarBtn = document.getElementById('buscar-btn');
+        const paseCard = document.getElementById('pase-card');
+        const errorCard = document.getElementById('error-card');
+        const successCard = document.getElementById('success-card');
+        const entradaBtn = document.getElementById('entrada-btn');
+        const salidaBtn = document.getElementById('salida-btn');
+        const activosList = document.getElementById('activos-list');
+        const activosCount = document.getElementById('activos-count');
+
+        // Actualizar hora y fecha
+        function updateDateTime() {
+            const now = new Date();
+            document.getElementById('current-time').textContent = now.toLocaleTimeString('es-ES');
+            document.getElementById('current-date').textContent = now.toLocaleDateString('es-ES');
+        }
+        setInterval(updateDateTime, 1000);
+        updateDateTime();
+
+        // Manejo de estado de conexión
+        function updateConnectionStatus() {
+            isOnline = navigator.onLine;
+            if (!isOnline) {
+                connectionStatus.classList.remove('hidden');
+            } else {
+                connectionStatus.classList.add('hidden');
+            }
+        }
+
+        window.addEventListener('online', updateConnectionStatus);
+        window.addEventListener('offline', updateConnectionStatus);
+        updateConnectionStatus();
+
+        // Fetch con manejo de errores de red
+        async function safeFetch(url, options = {}) {
+            if (!isOnline) {
+                throw new Error('Sin conexión a internet');
+            }
+
+            try {
+                const response = await fetch(url, options);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return await response.json();
+            } catch (error) {
+                console.error('Fetch error:', error);
+                throw error;
+            }
+        }
+
+        // Buscar pase por código
+        async function buscarPase() {
+            const codigo = codigoInput.value.trim().toUpperCase();
+
+            if (!codigo) {
+                showError('Por favor ingrese un código');
+                return;
+            }
+
+            if (!isOnline) {
+                showError('Sin conexión a internet. No se puede buscar pases.');
+                return;
+            }
+
+            try {
+                hideAllCards();
+                buscarBtn.disabled = true;
+                buscarBtn.textContent = '⏳ Buscando...';
+
+                const pase = await safeFetch(`/api/v1/pases/buscar/${codigo}`);
+                currentPase = pase;
+
+                mostrarPase(pase);
+            } catch (error) {
+                showError('Pase no encontrado o no está en estado PENDIENTE');
+                currentPase = null;
+            } finally {
+                buscarBtn.disabled = false;
+                buscarBtn.textContent = '🔍 Buscar';
+            }
+        }
+
+        // Mostrar información del pase
+        function mostrarPase(pase) {
+            document.getElementById('pase-codigo').textContent = pase.codigo;
+            document.getElementById('visitante-nombre').textContent = pase.visitante_nombre;
+            document.getElementById('visitante-cedula').textContent = pase.visitante_cedula;
+            document.getElementById('propiedad-unidad').textContent = pase.propiedad ? pase.propiedad.numero_unidad : 'N/A';
+
+            const estadoElement = document.getElementById('pase-estado');
+            estadoElement.textContent = pase.estado;
+
+            // Configurar colores según estado
+            if (pase.estado === 'PENDIENTE') {
+                estadoElement.className = 'px-4 py-2 rounded-full text-lg font-bold bg-yellow-100 text-yellow-800';
+                entradaBtn.disabled = false;
+                salidaBtn.disabled = true;
+            } else if (pase.estado === 'DENTRO') {
+                estadoElement.className = 'px-4 py-2 rounded-full text-lg font-bold bg-green-100 text-green-800';
+                entradaBtn.disabled = true;
+                salidaBtn.disabled = false;
+            } else {
+                estadoElement.className = 'px-4 py-2 rounded-full text-lg font-bold bg-gray-100 text-gray-800';
+                entradaBtn.disabled = true;
+                salidaBtn.disabled = true;
+            }
+
+            paseCard.classList.remove('hidden');
+        }
+
+        // Registrar entrada
+        async function registrarEntrada() {
+            if (!currentPase || !isOnline) {
+                showError('No se puede registrar entrada sin conexión');
+                return;
+            }
+
+            try {
+                entradaBtn.disabled = true;
+                entradaBtn.textContent = '⏳ Procesando...';
+
+                const paseActualizado = await safeFetch(`/api/v1/pases/${currentPase.id}/entrada`, {
+                    method: 'PATCH'
+                });
+
+                currentPase = paseActualizado;
+                mostrarPase(paseActualizado);
+                showSuccess('Entrada registrada correctamente');
+                cargarActivos();
+            } catch (error) {
+                showError('Error al registrar entrada: ' + error.message);
+            } finally {
+                entradaBtn.disabled = false;
+                entradaBtn.textContent = '✅ Registrar Entrada';
+            }
+        }
+
+        // Registrar salida
+        async function registrarSalida() {
+            if (!currentPase || !isOnline) {
+                showError('No se puede registrar salida sin conexión');
+                return;
+            }
+
+            try {
+                salidaBtn.disabled = true;
+                salidaBtn.textContent = '⏳ Procesando...';
+
+                const paseActualizado = await safeFetch(`/api/v1/pases/${currentPase.id}/salida`, {
+                    method: 'PATCH'
+                });
+
+                currentPase = paseActualizado;
+                mostrarPase(paseActualizado);
+                showSuccess('Salida registrada correctamente');
+                cargarActivos();
+            } catch (error) {
+                showError('Error al registrar salida: ' + error.message);
+            } finally {
+                salidaBtn.disabled = false;
+                salidaBtn.textContent = '🚪 Registrar Salida';
+            }
+        }
+
+        // Cargar visitantes activos
+        async function cargarActivos() {
+            if (!isOnline) {
+                activosList.innerHTML = '<div class="text-red-500 text-center py-4">⚠️ Sin conexión</div>';
+                return;
+            }
+
+            try {
+                const pases = await safeFetch('/api/v1/pases/activos');
+                activosCount.textContent = pases.length;
+
+                if (pases.length === 0) {
+                    activosList.innerHTML = '<div class="text-gray-500 text-center py-8">No hay visitantes activos</div>';
+                    return;
+                }
+
+                activosList.innerHTML = pases.map(pase => `
+                    <div class="bg-green-50 border-l-4 border-green-500 p-3 rounded">
+                        <div class="font-semibold text-gray-800">${pase.visitante_nombre}</div>
+                        <div class="text-sm text-gray-600">${pase.propiedad ? pase.propiedad.numero_unidad : 'N/A'}</div>
+                        <div class="text-xs text-green-600 font-mono">${pase.codigo}</div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                activosList.innerHTML = '<div class="text-red-500 text-center py-4">Error al cargar activos</div>';
+            }
+        }
+
+        // Utilidades de UI
+        function hideAllCards() {
+            paseCard.classList.add('hidden');
+            errorCard.classList.add('hidden');
+            successCard.classList.add('hidden');
+        }
+
+        function showError(message) {
+            hideAllCards();
+            document.getElementById('error-message').textContent = message;
+            errorCard.classList.remove('hidden');
+        }
+
+        function showSuccess(message) {
+            hideAllCards();
+            document.getElementById('success-message').textContent = message;
+            successCard.classList.remove('hidden');
+
+            // Ocultar mensaje de éxito después de 3 segundos
+            setTimeout(() => {
+                successCard.classList.add('hidden');
+            }, 3000);
+        }
+
+        // Event listeners
+        buscarBtn.addEventListener('click', buscarPase);
+        entradaBtn.addEventListener('click', registrarEntrada);
+        salidaBtn.addEventListener('click', registrarSalida);
+
+        codigoInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                buscarPase();
+            }
+        });
+
+        // Auto-formato del código (agregar guion después de 3 caracteres)
+        codigoInput.addEventListener('input', (e) => {
+            let value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+            if (value.length > 3) {
+                value = value.slice(0, 3) + '-' + value.slice(3, 6);
+            }
+            e.target.value = value;
+        });
+
+        // Cargar visitantes activos al inicio y cada 30 segundos
+        cargarActivos();
+        setInterval(cargarActivos, 30000);
+    </script>
+</body>
+</html>

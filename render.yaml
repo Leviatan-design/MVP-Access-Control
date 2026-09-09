@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: access-control-residencial
+    name: access-pass
     runtime: docker
     plan: free
     healthCheckPath: /health
@@ -9,3 +9,12 @@ services:
         value: /app/data
       - key: PORT
         value: 8080
+      - key: DATABASE_URL
+        fromDatabase:
+          name: access-pass-db
+          property: connectionString
+databases:
+  - name: access-pass-db
+    databaseName: access_pass
+    user: access_pass_user
+    plan: free

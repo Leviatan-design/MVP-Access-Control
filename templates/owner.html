@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Propietario - Access Pass</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .gradient-bg {
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #1e40af 100%);
+        }
+
+        .card-gradient {
+            background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+        }
+
+        .premium-card {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+            border: 2px solid #3b82f6;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .gold-accent {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        }
+
+        .pulse-glow {
+            animation: pulse-glow 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% {
+                box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+            }
+            50% {
+                box-shadow: 0 0 40px rgba(59, 130, 246, 0.6);
+            }
+        }
+
+        .slide-in {
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-backdrop {
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 10px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen">
+    <!-- Header -->
+    <header class="gradient-bg text-white shadow-2xl">
+        <div class="container mx-auto px-4 py-6">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                        <span class="text-2xl">🏠</span>
+                    </div>
+                    <div>
+                        <h1 class="text-2xl font-bold">Panel de Propietario</h1>
+                        <p class="text-blue-200 text-sm">Access Pass - FlowLogic</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="text-right">
+                        <div id="current-time" class="text-xl font-semibold">--:--</div>
+                        <div id="current-date" class="text-blue-200 text-xs">--/--/----</div>
+                    </div>
+                    <button onclick="logout()" class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-all duration-200">
+                        Salir
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Banner de Advertencia para Propiedades Insolventes -->
+    <div id="morosidad-banner" class="hidden bg-gradient-to-r from-red-600 to-orange-500 text-white py-4 px-6 shadow-lg">
+        <div class="container mx-auto flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <span class="text-3xl">⚠️</span>
+                <div>
+                    <h3 class="font-bold text-lg">Generación de Pases Suspendida</h3>
+                    <p class="text-sm opacity-90">Saldo pendiente en la unidad. Contacte administración.</p>
+                </div>
+            </div>
+            <button onclick="hideMorosidadBanner()" class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-all duration-200">
+                ✕
+            </button>
+        </div>
+    </div>
+
+    <div class="container mx-auto px-4 py-8">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Columna Izquierda: Estado de Vivienda y Habitantes -->
+            <div class="lg:col-span-1 space-y-6">
+                <!-- Widget de Estado de Vivienda -->
+                <div class="card-gradient rounded-2xl shadow-lg p-6 border border-slate-200">
+                    <h2 class="text-lg font-bold text-slate-800 mb-4 flex items-center">
+                        <span class="mr-2">📊</span> Estado de la Vivienda
+                    </h2>
+
+                    <div class="space-y-4">
+                        <!-- Información de la Propiedad -->
+                        <div class="bg-slate-50 rounded-xl p-4">
+                            <div class="text-sm text-slate-600 mb-1">Unidad</div>
+                            <div id="propiedad-unidad" class="text-xl font-bold text-slate-800">A-12</div>
+                        </div>
+
+                        <!-- Medidor de Habitantes -->
+                        <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-sm text-slate-600">Habitantes</span>
+                                <span id="habitantes-cupo" class="text-lg font-bold text-blue-600">2/4</span>
+                            </div>
+                            <div class="w-full bg-slate-200 rounded-full h-3">
+                                <div id="habitantes-bar" class="bg-gradient-to-r from-blue-500 to-indigo-500 h-3 rounded-full transition-all duration-500" style="width: 50%"></div>
+                            </div>
+                            <div class="flex justify-between mt-2 text-xs text-slate-500">
+                                <span id="habitantes-count">2 registrados</span>
+                                <span id="habitantes-disponibles">2 disponibles</span>
+                            </div>
+                        </div>
+
+                        <!-- Estado de Solvencia -->
+                        <div id="solvencia-widget" class="bg-green-50 border border-green-200 rounded-xl p-4">
+                            <div class="flex items-center">
+                                <span class="text-2xl mr-3">✅</span>
+                                <div>
+                                    <div class="font-semibold text-green-800">Solvencia Activa</div>
+                                    <div class="text-sm text-green-600">Pases habilitados</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Lista de Co-habitantes -->
+                <div class="card-gradient rounded-2xl shadow-lg p-6 border border-slate-200">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-lg font-bold text-slate-800 flex items-center">
+                            <span class="mr-2">👥</span> Co-habitantes
+                        </h2>
+                        <button
+                            onclick="openInvitarModal()"
+                            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 hover:scale-105"
+                        >
+                            + Invitar
+                        </button>
+                    </div>
+
+                    <div id="habitantes-list" class="space-y-3 max-h-64 overflow-y-auto custom-scrollbar">
+                        <div class="text-center py-8 text-slate-500">
+                            Cargando habitantes...
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Columna Derecha: Generación de Pases -->
+            <div class="lg:col-span-2 space-y-6">
+                <!-- Formulario de Generación de Pases -->
+                <div id="pase-form-container" class="card-gradient rounded-2xl shadow-lg p-6 border border-slate-200">
+                    <h2 class="text-lg font-bold text-slate-800 mb-4 flex items-center">
+                        <span class="mr-2">🎫</span> Generar Pase de Visita
+                    </h2>
+
+                    <form id="pase-form" class="space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Nombre del Visitante</label>
+                                <input
+                                    type="text"
+                                    id="visitante-nombre"
+                                    placeholder="Nombre completo"
+                                    class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                                    required
+                                >
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Cédula</label>
+                                <input
+                                    type="text"
+                                    id="visitante-cedula"
+                                    placeholder="V-12345678"
+                                    class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                                    required
+                                >
+                            </div>
+                        </div>
+
+                        <button
+                            type="submit"
+                            id="generar-pase-btn"
+                            class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-4 rounded-xl text-lg transition-all duration-200 hover:scale-105 shadow-lg"
+                        >
+                            🎫 Generar Pase Digital
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Tarjeta de Pase Digital (Oculta inicialmente) -->
+                <div id="pase-card-container" class="hidden">
+                    <div class="premium-card rounded-2xl p-8 text-white slide-in">
+                        <div class="flex items-center justify-between mb-6">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                                    <span class="text-xl">🏠</span>
+                                </div>
+                                <div>
+                                    <div class="font-bold text-lg">Access Pass</div>
+                                    <div class="text-blue-300 text-sm">FlowLogic</div>
+                                </div>
+                            </div>
+                            <div id="pase-estado" class="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm font-medium">
+                                ACTIVO
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-6 mb-6">
+                            <div>
+                                <div class="text-blue-300 text-sm mb-1">Visitante</div>
+                                <div id="pase-visitante" class="font-semibold text-lg">Juan Pérez</div>
+                            </div>
+                            <div>
+                                <div class="text-blue-300 text-sm mb-1">Unidad</div>
+                                <div id="pase-unidad" class="font-semibold text-lg">A-12</div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white/10 rounded-xl p-6 mb-6">
+                            <div class="text-center">
+                                <div id="pase-codigo" class="text-5xl font-bold tracking-wider mb-2 pulse-glow">ACC-902</div>
+                                <div class="text-blue-300 text-sm">Código de Acceso</div>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between">
+                            <div class="text-blue-300 text-sm">
+                                <div id="pase-fecha">09/09/2026</div>
+                                <div id="pase-hora">17:30</div>
+                            </div>
+                            <div id="qr-code" class="w-24 h-24 bg-white rounded-lg p-2">
+                                <!-- QR Code se generará aquí -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-4 mt-6">
+                        <button
+                            onclick="imprimirPase()"
+                            class="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-medium py-3 rounded-xl transition-all duration-200 hover:scale-105"
+                        >
+                            🖨️ Imprimir
+                        </button>
+                        <button
+                            onclick="compartirPase()"
+                            class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-xl transition-all duration-200 hover:scale-105"
+                        >
+                            📤 Compartir
+                        </button>
+                        <button
+                            onclick="nuevoPase()"
+                            class="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium py-3 rounded-xl transition-all duration-200 hover:scale-105"
+                        >
+                            ➕ Nuevo Pase
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Historial de Pases Recientes -->
+                <div class="card-gradient rounded-2xl shadow-lg p-6 border border-slate-200">
+                    <h2 class="text-lg font-bold text-slate-800 mb-4 flex items-center">
+                        <span class="mr-2">📋</span> Pases Recientes
+                    </h2>
+
+                    <div id="pases-recientes" class="space-y-3 max-h-64 overflow-y-auto custom-scrollbar">
+                        <div class="text-center py-8 text-slate-500">
+                            Cargando pases recientes...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Invitación de Habitante -->
+    <div id="invitar-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-backdrop">
+        <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 slide-in">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-xl font-bold text-slate-800">Invitar Co-habitante</h3>
+                <button onclick="closeInvitarModal()" class="text-slate-400 hover:text-slate-600">
+                    ✕
+                </button>
+            </div>
+
+            <form id="invitar-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Nombre Completo</label>
+                    <input
+                        type="text"
+                        id="invitar-nombre"
+                        placeholder="Nombre del co-habitante"
+                        class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                        required
+                    >
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Cédula</label>
+                    <input
+                        type="text"
+                        id="invitar-cedula"
+                        placeholder="V-12345678"
+                        class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                        required
+                    >
+                </div>
+
+                <div id="invitar-cupo-warning" class="hidden bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+                    <div class="flex items-center">
+                        <span class="text-2xl mr-3">⚠️</span>
+                        <div>
+                            <div class="font-semibold text-yellow-800">Cupo Limitado</div>
+                            <div class="text-sm text-yellow-600">Solo 1 cupo disponible para habitantes</div>
+                        </div>
+                    </div>
+                </div>
+
+                <button
+                    type="submit"
+                    class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-3 rounded-xl transition-all duration-200 hover:scale-105"
+                >
+                    ✉️ Enviar Invitación
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Configuración
+        let currentPropiedadId = 1; // TODO: Obtener del usuario autenticado
+        let currentUsuarioId = 1; // TODO: Obtener del usuario autenticado
+        let isOnline = navigator.onLine;
+
+        // Elementos del DOM
+        const morosidadBanner = document.getElementById('morosidad-banner');
+        const paseFormContainer = document.getElementById('pase-form-container');
+        const paseCardContainer = document.getElementById('pase-card-container');
+        const paseForm = document.getElementById('pase-form');
+        const invitarModal = document.getElementById('invitar-modal');
+        const invitarForm = document.getElementById('invitar-form');
+
+        // Actualizar hora y fecha
+        function updateDateTime() {
+            const now = new Date();
+            document.getElementById('current-time').textContent = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+            document.getElementById('current-date').textContent = now.toLocaleDateString('es-ES');
+        }
+        setInterval(updateDateTime, 1000);
+        updateDateTime();
+
+        // Fetch con manejo de errores
+        async function safeFetch(url, options = {}) {
+            if (!isOnline) {
+                throw new Error('Sin conexión a internet');
+            }
+
+            try {
+                const response = await fetch(url, options);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return await response.json();
+            } catch (error) {
+                console.error('Fetch error:', error);
+                throw error;
+            }
+        }
+
+        // Cargar información de la propiedad
+        async function cargarPropiedad() {
+            try {
+                const propiedad = await safeFetch(`/api/v1/propiedades/${currentPropiedadId}`);
+                document.getElementById('propiedad-unidad').textContent = propiedad.numero_unidad;
+
+                // Actualizar widget de solvencia
+                const solvenciaWidget = document.getElementById('solvencia-widget');
+                if (!propiedad.es_solvente) {
+                    solvenciaWidget.className = 'bg-red-50 border border-red-200 rounded-xl p-4';
+                    solvenciaWidget.innerHTML = `
+                        <div class="flex items-center">
+                            <span class="text-2xl mr-3">⚠️</span>
+                            <div>
+                                <div class="font-semibold text-red-800">Saldo Pendiente</div>
+                                <div class="text-sm text-red-600">Pases suspendidos</div>
+                            </div>
+                        </div>
+                    `;
+                    morosidadBanner.classList.remove('hidden');
+                    bloquearFormularioPases();
+                }
+
+                return propiedad;
+            } catch (error) {
+                console.error('Error al cargar propiedad:', error);
+            }
+        }
+
+        // Cargar habitantes
+        async function cargarHabitantes() {
+            try {
+                const habitantes = await safeFetch(`/api/v1/usuarios/vivienda/${currentPropiedadId}/habitantes`);
+                const conteo = await safeFetch(`/api/v1/usuarios/vivienda/${currentPropiedadId}/conteo`);
+
+                // Actualizar medidor
+                document.getElementById('habitantes-cupo').textContent = `${conteo.conteo_habitantes}/4`;
+                document.getElementById('habitantes-count').textContent = `${conteo.conteo_habitantes} registrados`;
+                document.getElementById('habitantes-disponibles').textContent = `${conteo.cupos_disponibles} disponibles`;
+
+                const percentage = (conteo.conteo_habitantes / 4) * 100;
+                document.getElementById('habitantes-bar').style.width = `${percentage}%`;
+
+                // Cambiar color del medidor según el cupo
+                const bar = document.getElementById('habitantes-bar');
+                if (percentage >= 100) {
+                    bar.className = 'bg-gradient-to-r from-red-500 to-orange-500 h-3 rounded-full transition-all duration-500';
+                } else if (percentage >= 75) {
+                    bar.className = 'bg-gradient-to-r from-yellow-500 to-orange-500 h-3 rounded-full transition-all duration-500';
+                }
+
+                // Actualizar lista de habitantes
+                const habitantesList = document.getElementById('habitantes-list');
+                if (habitantes.length === 0) {
+                    habitantesList.innerHTML = '<div class="text-center py-8 text-slate-500">No hay co-habitantes registrados</div>';
+                } else {
+                    habitantesList.innerHTML = habitantes.map(h => `
+                        <div class="bg-slate-50 rounded-xl p-4 flex items-center justify-between">
+                            <div>
+                                <div class="font-semibold text-slate-800">${h.nombre}</div>
+                                <div class="text-sm text-slate-600">${h.cedula}</div>
+                            </div>
+                            <div class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
+                                ${h.rol}
+                            </div>
+                        </div>
+                    `).join('');
+                }
+
+                return conteo;
+            } catch (error) {
+                console.error('Error al cargar habitantes:', error);
+            }
+        }
+
+        // Cargar pases recientes
+        async function cargarPasesRecientes() {
+            try {
+                const pases = await safeFetch(`/api/v1/pases/propiedad/${currentPropiedadId}`);
+                const pasesRecientes = document.getElementById('pases-recientes');
+
+                if (pases.length === 0) {
+                    pasesRecientes.innerHTML = '<div class="text-center py-8 text-slate-500">No hay pases recientes</div>';
+                } else {
+                    pasesRecientes.innerHTML = pases.slice(0, 5).map(p => `
+                        <div class="bg-slate-50 rounded-xl p-4 flex items-center justify-between">
+                            <div>
+                                <div class="font-semibold text-slate-800">${p.visitante_nombre}</div>
+                                <div class="text-sm text-slate-600">${p.codigo}</div>
+                            </div>
+                            <div class="px-3 py-1 ${
+                                p.estado === 'PENDIENTE' ? 'bg-yellow-100 text-yellow-800' :
+                                p.estado === 'DENTRO' ? 'bg-green-100 text-green-800' :
+                                'bg-gray-100 text-gray-800'
+                            } rounded-full text-xs font-medium">
+                                ${p.estado}
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Error al cargar pases recientes:', error);
+            }
+        }
+
+        // Generar pase
+        async function generarPase(e) {
+            e.preventDefault();
+
+            if (!isOnline) {
+                alert('Sin conexión a internet. No se puede generar el pase.');
+                return;
+            }
+
+            const nombre = document.getElementById('visitante-nombre').value;
+            const cedula = document.getElementById('visitante-cedula').value;
+
+            try {
+                const btn = document.getElementById('generar-pase-btn');
+                btn.disabled = true;
+                btn.textContent = '⏳ Generando...';
+
+                const pase = await safeFetch('/api/v1/pases/crear', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        propiedad_id: currentPropiedadId,
+                        visitante_nombre: nombre,
+                        visitante_cedula: cedula,
+                        usuario_creador_id: currentUsuarioId
+                    })
+                });
+
+                mostrarTarjetaPase(pase);
+                cargarPasesRecientes();
+            } catch (error) {
+                alert('Error al generar pase: ' + error.message);
+            } finally {
+                const btn = document.getElementById('generar-pase-btn');
+                btn.disabled = false;
+                btn.textContent = '🎫 Generar Pase Digital';
+            }
+        }
+
+        // Mostrar tarjeta de pase
+        function mostrarTarjetaPase(pase) {
+            paseFormContainer.classList.add('hidden');
+            paseCardContainer.classList.remove('hidden');
+
+            document.getElementById('pase-visitante').textContent = pase.visitante_nombre;
+            document.getElementById('pase-unidad').textContent = document.getElementById('propiedad-unidad').textContent;
+            document.getElementById('pase-codigo').textContent = pase.codigo;
+
+            const now = new Date();
+            document.getElementById('pase-fecha').textContent = now.toLocaleDateString('es-ES');
+            document.getElementById('pase-hora').textContent = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+
+            // Generar QR Code
+            const qrContainer = document.getElementById('qr-code');
+            qrContainer.innerHTML = '';
+            QRCode.toCanvas(qrContainer, pase.codigo, {
+                width: 96,
+                margin: 1,
+                color: {
+                    dark: '#1e3a8a',
+                    light: '#ffffff'
+                }
+            });
+        }
+
+        // Invitar co-habitante
+        async function invitarHabitante(e) {
+            e.preventDefault();
+
+            if (!isOnline) {
+                alert('Sin conexión a internet. No se puede enviar la invitación.');
+                return;
+            }
+
+            const nombre = document.getElementById('invitar-nombre').value;
+            const cedula = document.getElementById('invitar-cedula').value;
+
+            try {
+                await safeFetch('/api/v1/usuarios/vivienda/invitar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        nombre: nombre,
+                        cedula: cedula,
+                        propiedad_id: currentPropiedadId,
+                        usuario_autorizador_id: currentUsuarioId
+                    })
+                });
+
+                closeInvitarModal();
+                cargarHabitantes();
+                alert('Co-habitante invitado exitosamente');
+            } catch (error) {
+                alert('Error al invitar co-habitante: ' + error.message);
+            }
+        }
+
+        // Bloquear formulario de pases
+        function bloquearFormularioPases() {
+            paseFormContainer.classList.add('opacity-50', 'pointer-events-none');
+        }
+
+        // Funciones de modal
+        function openInvitarModal() {
+            const conteo = cargarHabitantes(); // Obtener conteo actual
+            // Verificar cupo antes de abrir modal
+            if (conteo && conteo.cupos_disponibles <= 1) {
+                document.getElementById('invitar-cupo-warning').classList.remove('hidden');
+            }
+            invitarModal.classList.remove('hidden');
+        }
+
+        function closeInvitarModal() {
+            invitarModal.classList.add('hidden');
+            invitarForm.reset();
+            document.getElementById('invitar-cupo-warning').classList.add('hidden');
+        }
+
+        function hideMorosidadBanner() {
+            morosidadBanner.classList.add('hidden');
+        }
+
+        // Funciones de tarjeta de pase
+        function nuevoPase() {
+            paseCardContainer.classList.add('hidden');
+            paseFormContainer.classList.remove('hidden');
+            paseForm.reset();
+        }
+
+        function imprimirPase() {
+            window.print();
+        }
+
+        function compartirPase() {
+            const codigo = document.getElementById('pase-codigo').textContent;
+            if (navigator.share) {
+                navigator.share({
+                    title: 'Pase de Acceso',
+                    text: `Tu código de acceso es: ${codigo}`
+                });
+            } else {
+                // Fallback para navegadores que no soportan Web Share API
+                navigator.clipboard.writeText(codigo);
+                alert('Código copiado al portapapeles');
+            }
+        }
+
+        function logout() {
+            window.location.href = '/';
+        }
+
+        // Event listeners
+        paseForm.addEventListener('submit', generarPase);
+        invitarForm.addEventListener('submit', invitarHabitante);
+
+        // Cargar datos al inicio
+        cargarPropiedad();
+        cargarHabitantes();
+        cargarPasesRecientes();
+    </script>
+</body>
+</html>

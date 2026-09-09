@@ -4,98 +4,124 @@ from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session
 
-from app.models import AccessType, Property, Visit, VisitStatus
+from app.models import Condominio, Propiedad, Usuario, Pase
 
 
 def generate_code(db: Session) -> str:
+    """Genera un código único para pases."""
     while True:
         letters = "".join(random.choices(string.ascii_uppercase, k=3))
         digits = "".join(random.choices(string.digits, k=3))
         code = f"{letters}-{digits}"
-        exists = db.query(Visit).filter(Visit.code == code).first()
+        exists = db.query(Pase).filter(Pase.codigo == code).first()
         if not exists:
             return code
 
 
 def seed_database(db: Session) -> None:
-    if db.query(Property).count() > 0:
+    """Inicializa la base de datos con datos de ejemplo."""
+    # Solo sembrar si no hay datos
+    if db.query(Condominio).count() > 0:
         return
 
-    properties = [
-        Property(name="Casa 12 Bloque A", unit="A-12", owner_name="María González"),
-        Property(name="Apartamento 301 Torre B", unit="B-301", owner_name="Carlos Ruiz"),
-        Property(name="Casa 5 Conjunto Sol", unit="SOL-05", owner_name="Ana Martínez"),
-    ]
-    db.add_all(properties)
+    # Crear condominio
+    condominio = Condominio(
+        nombre="Conjunto Residencial FlowLogic",
+        direccion="Av. Principal #123, Ciudad"
+    )
+    db.add(condominio)
     db.flush()
 
+    # Crear propiedades
+    propiedades = [
+        Propiedad(
+            condominio_id=condominio.id,
+            numero_unidad="A-12",
+            es_solvente=True
+        ),
+        Propiedad(
+            condominio_id=condominio.id,
+            numero_unidad="B-301",
+            es_solvente=True
+        ),
+        Propiedad(
+            condominio_id=condominio.id,
+            numero_unidad="SOL-05",
+            es_solvente=True
+        ),
+    ]
+    db.add_all(propiedades)
+    db.flush()
+
+    # Crear usuarios (ADMIN_CASA para cada propiedad)
+    usuarios = [
+        Usuario(
+            propiedad_id=propiedades[0].id,
+            nombre="María González",
+            cedula="V-12345678",
+            rol="ADMIN_CASA"
+        ),
+        Usuario(
+            propiedad_id=propiedades[1].id,
+            nombre="Carlos Ruiz",
+            cedula="V-87654321",
+            rol="ADMIN_CASA"
+        ),
+        Usuario(
+            propiedad_id=propiedades[2].id,
+            nombre="Ana Martínez",
+            cedula="V-99887766",
+            rol="ADMIN_CASA"
+        ),
+        # Super admin
+        Usuario(
+            propiedad_id=None,
+            nombre="Admin Principal",
+            cedula="ADMIN-001",
+            rol="SUPER_ADMIN"
+        ),
+    ]
+    db.add_all(usuarios)
+    db.flush()
+
+    # Crear algunos co-habitantes de ejemplo
+    cohabitantes = [
+        Usuario(
+            propiedad_id=propiedades[0].id,
+            nombre="Juan González",
+            cedula="V-12345679",
+            rol="COHABITANTE"
+        ),
+        Usuario(
+            propiedad_id=propiedades[1].id,
+            nombre="Laura Ruiz",
+            cedula="V-87654322",
+            rol="COHABITANTE"
+        ),
+    ]
+    db.add_all(cohabitantes)
+
+    # Crear algunos pases de ejemplo
     now = datetime.now()
-    today_morning = now.replace(hour=9, minute=0, second=0, microsecond=0)
-
-    scheduled_visits = [
-        {
-            "property_id": properties[0].id,
-            "visitor_name": "Pedro López",
-            "visitor_id": "V-12345678",
-            "access_type": AccessType.PEATONAL,
-            "scheduled_at": today_morning + timedelta(hours=2),
-            "code": "ACC-902",
-            "status": VisitStatus.SCHEDULED,
-        },
-        {
-            "property_id": properties[0].id,
-            "visitor_name": "Laura Sánchez",
-            "visitor_id": "V-87654321",
-            "access_type": AccessType.VEHICULAR,
-            "scheduled_at": today_morning + timedelta(hours=4),
-            "code": "VIS-415",
-            "status": VisitStatus.SCHEDULED,
-        },
-        {
-            "property_id": properties[1].id,
-            "visitor_name": "Roberto Díaz",
-            "visitor_id": "V-11223344",
-            "access_type": AccessType.PEATONAL,
-            "scheduled_at": today_morning + timedelta(hours=1),
-            "code": "ENT-733",
-            "status": VisitStatus.SCHEDULED,
-        },
-        {
-            "property_id": properties[2].id,
-            "visitor_name": "Sofía Herrera",
-            "visitor_id": "V-99887766",
-            "access_type": AccessType.VEHICULAR,
-            "scheduled_at": today_morning + timedelta(hours=6),
-            "code": "PAS-128",
-            "status": VisitStatus.SCHEDULED,
-        },
+    pases = [
+        Pase(
+            propiedad_id=propiedades[0].id,
+            visitante_nombre="Pedro López",
+            visitante_cedula="V-55555555",
+            codigo=generate_code(db),
+            estado="PENDIENTE",
+            created_at=now
+        ),
+        Pase(
+            propiedad_id=propiedades[1].id,
+            visitante_nombre="Roberto Díaz",
+            visitante_cedula="V-66666666",
+            codigo=generate_code(db),
+            estado="DENTRO",
+            created_at=now - timedelta(hours=1)
+        ),
     ]
-
-    inside_visits = [
-        {
-            "property_id": properties[1].id,
-            "visitor_name": "Miguel Torres",
-            "visitor_id": "V-55443322",
-            "access_type": AccessType.PEATONAL,
-            "scheduled_at": today_morning - timedelta(hours=1),
-            "code": "ING-556",
-            "status": VisitStatus.INSIDE,
-            "entry_at": today_morning - timedelta(minutes=45),
-        },
-        {
-            "property_id": properties[2].id,
-            "visitor_name": "Diana Vega",
-            "visitor_id": "V-66778899",
-            "access_type": AccessType.VEHICULAR,
-            "scheduled_at": today_morning - timedelta(minutes=30),
-            "code": "AUT-789",
-            "status": VisitStatus.INSIDE,
-            "entry_at": today_morning - timedelta(minutes=15),
-        },
-    ]
-
-    for data in scheduled_visits + inside_visits:
-        visit = Visit(**data)
-        db.add(visit)
+    db.add_all(pases)
 
     db.commit()
+    print("Base de datos inicializada con datos de ejemplo")

@@ -1,48 +1,55 @@
-import enum
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 
 from app.database import Base
 
 
-class AccessType(str, enum.Enum):
-    PEATONAL = "peatonal"
-    VEHICULAR = "vehicular"
-
-
-class VisitStatus(str, enum.Enum):
-    SCHEDULED = "scheduled"
-    INSIDE = "inside"
-    EXITED = "exited"
-    CANCELLED = "cancelled"
-
-
-class Property(Base):
-    __tablename__ = "properties"
+class Condominio(Base):
+    __tablename__ = "condominios"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(120), nullable=False)
-    unit = Column(String(40), nullable=False)
-    owner_name = Column(String(120), nullable=False)
+    nombre = Column(String(200), nullable=False)
+    direccion = Column(String(400), nullable=False)
 
-    visits = relationship("Visit", back_populates="property")
+    propiedades = relationship("Propiedad", back_populates="condominio")
 
 
-class Visit(Base):
-    __tablename__ = "visits"
+class Propiedad(Base):
+    __tablename__ = "propiedades"
 
     id = Column(Integer, primary_key=True, index=True)
-    property_id = Column(Integer, ForeignKey("properties.id"), nullable=False)
-    visitor_name = Column(String(120), nullable=False)
-    visitor_id = Column(String(40), nullable=False)
-    access_type = Column(Enum(AccessType), nullable=False)
-    scheduled_at = Column(DateTime, nullable=False)
-    code = Column(String(10), unique=True, nullable=False, index=True)
-    status = Column(Enum(VisitStatus), default=VisitStatus.SCHEDULED, nullable=False)
-    entry_at = Column(DateTime, nullable=True)
-    exit_at = Column(DateTime, nullable=True)
+    condominio_id = Column(Integer, ForeignKey("condominios.id"), nullable=False)
+    numero_unidad = Column(String(50), nullable=False)
+    es_solvente = Column(Boolean, default=True, nullable=False)
+
+    condominio = relationship("Condominio", back_populates="propiedades")
+    usuarios = relationship("Usuario", back_populates="propiedad")
+    pases = relationship("Pase", back_populates="propiedad")
+
+
+class Usuario(Base):
+    __tablename__ = "usuarios"
+
+    id = Column(Integer, primary_key=True, index=True)
+    propiedad_id = Column(Integer, ForeignKey("propiedades.id"), nullable=True)
+    nombre = Column(String(200), nullable=False)
+    cedula = Column(String(20), unique=True, nullable=False, index=True)
+    rol = Column(String(50), nullable=False)  # SUPER_ADMIN, ADMIN_CASA, COHABITANTE, VIGILANTE
+
+    propiedad = relationship("Propiedad", back_populates="usuarios")
+
+
+class Pase(Base):
+    __tablename__ = "pases"
+
+    id = Column(Integer, primary_key=True, index=True)
+    propiedad_id = Column(Integer, ForeignKey("propiedades.id"), nullable=False)
+    visitante_nombre = Column(String(200), nullable=False)
+    visitante_cedula = Column(String(20), nullable=False)
+    codigo = Column(String(20), unique=True, nullable=False, index=True)
+    estado = Column(String(50), default="PENDIENTE", nullable=False)  # PENDIENTE, DENTRO, FINALIZADO
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
-    property = relationship("Property", back_populates="visits")
+    propiedad = relationship("Propiedad", back_populates="pases")

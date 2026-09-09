@@ -7,9 +7,14 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 DATA_DIR = Path(os.environ.get("DATA_DIR", "./data"))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-DATABASE_URL = os.environ.get("DATABASE_URL", f"sqlite:///{DATA_DIR / 'access.db'}")
+# PostgreSQL connection string
+DATABASE_URL = os.environ.get(
+    "DATABASE_URL",
+    "postgresql://postgres:postgres@localhost:5432/access_pass"
+)
 
-connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+# PostgreSQL doesn't need check_same_thread
+connect_args = {} if DATABASE_URL.startswith("postgresql") else {"check_same_thread": False}
 
 engine = create_engine(DATABASE_URL, connect_args=connect_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
