@@ -48,6 +48,16 @@ class OwnerProperty:
     name: str
     unit: str
     owner_name: str
+    owner_id: Optional[int]
+    es_solvente: bool
+
+
+@dataclass
+class OwnerResident:
+    id: int
+    name: str
+    cedula: str
+    role: str
 
 
 @dataclass
@@ -146,7 +156,7 @@ def owner_panel(
     property_id: Optional[int] = Query(default=None),
     db: Session = Depends(get_db),
 ) -> HTMLResponse:
-    """Renderiza el panel con propiedades y pases desde PostgreSQL."""
+    """Renderiza el panel con propiedades, habitantes y pases."""
     properties = db.query(Propiedad).options(joinedload(Propiedad.condominio)).order_by(Propiedad.id).all()
     if not properties:
         raise HTTPException(status_code=404, detail="No hay propiedades registradas")
@@ -158,14 +168,20 @@ def owner_panel(
         name=selected_model.condominio.nombre if selected_model.condominio else "Propiedad",
         unit=selected_model.numero_unidad,
         owner_name=owner.nombre if owner else "Propietario no registrado",
+        owner_id=owner.id if owner else None,
+        es_solvente=selected_model.es_solvente,
     )
-
-    pases = (
-        db.query(Pase)
-        .filter(Pase.propiedad_id == selected_model.id)
-        .order_by(Pase.created_at.desc())
-        .all()
-    )
+    inhabitants = [
+        OwnerResident(
+            id=user.id,
+            name=user.nombre,
+            cedula=user.cedula,
+            role="Administrador de casa" if user.rol == "ADMIN_CASA" else "Co-habitante",
+        )
+        for user in selected_model.usuarios
+        if user.rol in {"ADMIN_CASA", "COHABITANTE"}
+    ]
+    pases = db.query(Pase).filter(Pase.propiedad_id == selected_model.id).order_by(Pase.created_at.desc()).all()
     visits = [
         OwnerVisit(
             visitor_name=pase.visitante_nombre,
@@ -173,38 +189,30 @@ def owner_panel(
             access_type=OwnerAccessType.PEATONAL,
             scheduled_at=pase.created_at,
             code=pase.codigo,
-            status={
-                "PENDIENTE": OwnerVisitStatus.SCHEDULED,
-                "DENTRO": OwnerVisitStatus.INSIDE,
-                "FINALIZADO": OwnerVisitStatus.EXITED,
-            }.get(pase.estado, OwnerVisitStatus.CANCELLED),
+            status={"PENDIENTE": OwnerVisitStatus.SCHEDULED, "DENTRO": OwnerVisitStatus.INSIDE, "FINALIZADO": OwnerVisitStatus.EXITED}.get(pase.estado, OwnerVisitStatus.CANCELLED),
         )
         for pase in pases
     ]
-
-    return templates.TemplateResponse(
-        "owner.html",
-        {
-            "request": request,
-            "properties": [
-                OwnerProperty(
-                    id=item.id,
-                    name=item.condominio.nombre if item.condominio else "Propiedad",
-                    unit=item.numero_unidad,
-                    owner_name=next(
-                        (user.nombre for user in item.usuarios if user.rol == "ADMIN_CASA"),
-                        "Propietario no registrado",
-                    ),
-                )
-                for item in properties
-            ],
-            "selected_property": selected_property,
-            "visits": visits,
-            "now_iso": datetime.now().strftime("%Y-%m-%dT%H:%M"),
-        },
-    )
-
-
+    property_views = []
+    for item in properties:
+        item_owner = next((user for user in item.usuarios if user.rol == "ADMIN_CASA"), None)
+        property_views.append(OwnerProperty(
+            id=item.id,
+            name=item.condominio.nombre if item.condominio else "Propiedad",
+            unit=item.numero_unidad,
+            owner_name=item_owner.nombre if item_owner else "Propietario no registrado",
+            owner_id=item_owner.id if item_owner else None,
+            es_solvente=item.es_solvente,
+        ))
+    return templates.TemplateResponse("owner.html", {
+        "request": request,
+        "properties": property_views,
+        "selected_property": selected_property,
+        "inhabitants": inhabitants,
+        "habitants_count": len(inhabitants),
+        "visits": visits,
+        "now_iso": datetime.now().strftime("%Y-%m-%dT%H:%M"),
+    })
 @app.post("/owner/visits")
 def create_owner_visit(
     property_id: int = Form(...),
@@ -240,7 +248,6 @@ def create_owner_visit(
     db.commit()
     db.refresh(pase)
     return RedirectResponse(url=f"/owner?property_id={property_id}&created={pase.codigo}", status_code=303)
-
 
 # Nuevos endpoints para Pases (adaptación del sistema anterior)
 @app.get("/api/pases/today")
