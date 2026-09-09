@@ -7,12 +7,12 @@ services:
     envVars:
       - key: DATA_DIR
         value: /app/data
-      - key: PORT
-        value: 8080
       - key: DATABASE_URL
         fromDatabase:
           name: access-pass-db
           property: connectionString
+      - key: PYTHONUNBUFFERED
+        value: 1
 databases:
   - name: access-pass-db
     databaseName: access_pass

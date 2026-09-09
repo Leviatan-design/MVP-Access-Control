@@ -13,6 +13,10 @@ DATABASE_URL = os.environ.get(
     "postgresql://postgres:postgres@localhost:5432/access_pass"
 )
 
+# Render may provide the legacy postgres:// scheme.
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = "postgresql://" + DATABASE_URL[len("postgres://"):]
+
 # PostgreSQL doesn't need check_same_thread
 connect_args = {} if DATABASE_URL.startswith("postgresql") else {"check_same_thread": False}
 
