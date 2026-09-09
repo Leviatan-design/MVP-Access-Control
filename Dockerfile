@@ -23,7 +23,7 @@ COPY alembic/ ./alembic/
 COPY alembic.ini ./
 COPY entrypoint.sh ./
 
-RUN chmod +x entrypoint.sh
+RUN sed -i 's/\r$//' entrypoint.sh && chmod +x entrypoint.sh
 RUN mkdir -p /app/data && chown -R appuser:appuser /app
 
 USER appuser
@@ -34,5 +34,5 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:' + __import__('os').environ.get('PORT', '8080') + '/health')" || exit 1
 
 # Para desarrollo local: usar entrypoint con migraciones
-ENTRYPOINT ["./entrypoint.sh"]
+ENTRYPOINT ["sh", "./entrypoint.sh"]
 CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080}"]

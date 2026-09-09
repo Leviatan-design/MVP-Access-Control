@@ -62,19 +62,19 @@
         <div class="flex justify-between items-start gap-3">
           <div>
             <p class="text-lg font-bold">{{ visit.visitor_name }}</p>
-            <p class="text-slate-600">{{ visit.property.name }} ({{ visit.property.unit }})</p>
-            <p class="text-sm text-slate-500">{{ visit.scheduled_at.strftime('%H:%M') }} · {{ visit.access_type.value|capitalize }}</p>
+            <p class="text-slate-600">{{ visit.propiedad.condominio.nombre if visit.propiedad.condominio else 'Propiedad' }} ({{ visit.propiedad.numero_unidad }})</p>
+            <p class="text-sm text-slate-500">{{ visit.created_at.strftime('%H:%M') }} · Peatonal</p>
           </div>
           <span class="font-mono text-xl font-black text-amber-800">{{ visit.code }}</span>
         </div>
         <div class="mt-4 flex gap-3">
-          {% if visit.status.value == 'scheduled' %}
-          <button onclick="markEntry({{ visit.id }})"
+          {% if visit.estado == 'PENDIENTE' %}
+              <button onclick="markEntry({{ visit.id }})"
                   class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-lg font-bold py-3 rounded-xl transition">
             Marcar Entrada
           </button>
           {% else %}
-          <button onclick="markExit({{ visit.id }})"
+              <button onclick="markExit({{ visit.id }})"
                   class="flex-1 bg-red-600 hover:bg-red-700 text-white text-lg font-bold py-3 rounded-xl transition">
             Marcar Salida
           </button>
@@ -96,9 +96,9 @@
         <div class="flex justify-between items-start gap-3">
           <div>
             <p class="text-lg font-bold">{{ visit.visitor_name }}</p>
-            <p class="text-slate-600">{{ visit.property.name }} ({{ visit.property.unit }})</p>
+              <p class="text-slate-600">{{ visit.propiedad.condominio.nombre if visit.propiedad.condominio else 'Propiedad' }} ({{ visit.propiedad.numero_unidad }})</p>
             <p class="text-sm text-slate-500">
-              Entrada: {{ visit.entry_at.strftime('%H:%M') if visit.entry_at else '—' }}
+              Registrado: {{ visit.created_at.strftime('%H:%M') }}
             </p>
           </div>
           <span class="font-mono text-xl font-black text-emerald-800">{{ visit.code }}</span>
@@ -184,7 +184,7 @@
       showToast('Ingresa un código de acceso', false);
       return;
     }
-    const res = await fetch('/api/visits/search?code=' + encodeURIComponent(code));
+    const res = await fetch('/api/pases/search?codigo=' + encodeURIComponent(code));
     if (!res.ok) {
       document.getElementById('search-result').classList.add('hidden');
       showToast('Código no encontrado', false);
@@ -196,7 +196,7 @@
   }
 
   async function markEntry(id) {
-    const res = await fetch('/api/visits/' + id + '/entry', { method: 'POST' });
+    const res = await fetch('/api/pases/' + id + '/entry', { method: 'POST' });
     const data = await res.json();
     if (!res.ok) {
       showToast(data.detail || 'No se pudo registrar la entrada', false);
@@ -207,7 +207,7 @@
   }
 
   async function markExit(id) {
-    const res = await fetch('/api/visits/' + id + '/exit', { method: 'POST' });
+    const res = await fetch('/api/pases/' + id + '/exit', { method: 'POST' });
     const data = await res.json();
     if (!res.ok) {
       showToast(data.detail || 'No se pudo registrar la salida', false);
@@ -219,8 +219,8 @@
 
   async function refreshLists() {
     const [expectedRes, insideRes] = await Promise.all([
-      fetch('/api/visits/today'),
-      fetch('/api/visits/inside')
+      fetch('/api/pases/today'),
+      fetch('/api/pases/inside')
     ]);
     const expected = await expectedRes.json();
     const inside = await insideRes.json();

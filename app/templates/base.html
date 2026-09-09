@@ -7,6 +7,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
+      darkMode: 'class',
       theme: {
         extend: {
           colors: {
@@ -17,19 +18,28 @@
       }
     }
   </script>
+  <style>
+    .dark .bg-white { background-color: #0f172a !important; }
+    .dark .bg-slate-50 { background-color: #111827 !important; }
+    .dark .bg-slate-100 { background-color: #1e293b !important; }
+    .dark .text-slate-900, .dark .text-slate-800, .dark .text-slate-700 { color: #e2e8f0 !important; }
+    .dark .text-slate-600, .dark .text-slate-500 { color: #94a3b8 !important; }
+    .dark .border-slate-100, .dark .border-slate-200, .dark .border-slate-300 { border-color: #334155 !important; }
+  </style>
   {% block head %}{% endblock %}
 </head>
-<body class="min-h-screen bg-slate-50 text-slate-900">
+<body class="min-h-screen bg-slate-50 text-slate-900 transition-colors duration-200 dark:bg-slate-950 dark:text-slate-100">
   <header class="bg-brand-900 text-white shadow-lg">
     <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
       <div>
         <p class="text-xs uppercase tracking-widest text-brand-100">MVP Demo</p>
         <h1 class="text-xl font-bold">Control de Acceso Residencial</h1>
       </div>
-      <nav class="flex gap-2 text-sm">
+      <nav class="flex items-center gap-2 text-sm">
         <a href="/" class="px-3 py-2 rounded-lg hover:bg-brand-700 transition">Inicio</a>
         <a href="/owner" class="px-3 py-2 rounded-lg hover:bg-brand-700 transition">Propietario</a>
         <a href="/guard" class="px-3 py-2 rounded-lg hover:bg-guard-700 transition">Garita</a>
+        <button id="theme-toggle" type="button" class="rounded-lg bg-white/10 px-3 py-2 transition hover:bg-white/20" aria-label="Cambiar modo de color">Modo oscuro</button>
       </nav>
     </div>
   </header>
@@ -38,10 +48,21 @@
     {% block content %}{% endblock %}
   </main>
 
-  <footer class="text-center text-sm text-slate-500 py-6">
+  <footer class="py-6 text-center text-sm text-slate-500 dark:text-slate-400">
     Sistema de Control de Acceso Residencial &mdash; Demo
   </footer>
 
   {% block scripts %}{% endblock %}
+  <script>
+    (function () {
+      const root = document.documentElement;
+      const toggle = document.getElementById('theme-toggle');
+      const saved = localStorage.getItem('resipass-theme');
+      if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) root.classList.add('dark');
+      function updateLabel() { toggle.textContent = root.classList.contains('dark') ? 'Modo claro' : 'Modo oscuro'; }
+      updateLabel();
+      toggle.addEventListener('click', function () { root.classList.toggle('dark'); localStorage.setItem('resipass-theme', root.classList.contains('dark') ? 'dark' : 'light'); updateLabel(); });
+    }());
+  </script>
 </body>
 </html>

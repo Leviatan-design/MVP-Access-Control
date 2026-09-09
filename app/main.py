@@ -92,6 +92,12 @@ app.include_router(propiedades_router)
 
 def pase_to_dict(pase: Pase) -> dict:
     """Convierte un objeto Pase a diccionario para respuesta JSON."""
+    property_name = "Propiedad"
+    property_unit = ""
+    if pase.propiedad:
+        property_name = pase.propiedad.condominio.nombre if pase.propiedad.condominio else property_name
+        property_unit = pase.propiedad.numero_unidad
+    status_labels = {"PENDIENTE": "Agendada", "DENTRO": "Dentro", "FINALIZADO": "Salió"}
     return {
         "id": pase.id,
         "propiedad_id": pase.propiedad_id,
@@ -100,6 +106,16 @@ def pase_to_dict(pase: Pase) -> dict:
         "codigo": pase.codigo,
         "estado": pase.estado,
         "created_at": pase.created_at.isoformat() if pase.created_at else None,
+        "visitor_name": pase.visitante_nombre,
+        "visitor_id": pase.visitante_cedula,
+        "code": pase.codigo,
+        "status": {"PENDIENTE": "scheduled", "DENTRO": "inside", "FINALIZADO": "exited"}.get(pase.estado, "cancelled"),
+        "status_label": status_labels.get(pase.estado, pase.estado),
+        "property_name": property_name,
+        "property_unit": property_unit,
+        "access_type_label": "Peatonal",
+        "scheduled_at_display": pase.created_at.strftime("%d/%m/%Y %H:%M") if pase.created_at else "",
+        "entry_at_display": pase.created_at.strftime("%d/%m/%Y %H:%M") if pase.created_at else None,
     }
 
 
@@ -140,8 +156,20 @@ def health() -> dict:
 
 
 @app.get("/", response_class=HTMLResponse)
-def home(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse("index.html", {"request": request})
+def home(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
+    property_count = db.query(Propiedad).count()
+    expected_count = db.query(Pase).filter(
+        Pase.estado == "PENDIENTE",
+        Pase.created_at >= datetime.combine(datetime.now().date(), time.min),
+        Pase.created_at <= datetime.combine(datetime.now().date(), time.max),
+    ).count()
+    inside_count = db.query(Pase).filter(Pase.estado == "DENTRO").count()
+    return templates.TemplateResponse("index.html", {
+        "request": request,
+        "property_count": property_count,
+        "expected_count": expected_count,
+        "inside_count": inside_count,
+    })
 
 
 @app.get("/guard", response_class=HTMLResponse)
