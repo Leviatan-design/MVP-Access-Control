@@ -1,154 +1,49 @@
 {% extends "base.html" %}
 
-{% block title %}Panel Propietario | Control de Acceso{% endblock %}
+{% block title %}Panel Propietario | Resipass{% endblock %}
 
 {% block head %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  .owner-shell { background: radial-gradient(circle at top right, rgba(59,130,246,.12), transparent 36%), #f8fafc; }
+  .soft-grid { background-image: linear-gradient(rgba(148,163,184,.08) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,.08) 1px, transparent 1px); background-size: 28px 28px; }
+  .pass-perforation { background-image: radial-gradient(circle at 0 50%, transparent 8px, #172554 9px), radial-gradient(circle at 100% 50%, transparent 8px, #172554 9px); background-position: left center, right center; background-repeat: no-repeat; }
+</style>
 {% endblock %}
 
 {% block content %}
-<div class="grid lg:grid-cols-2 gap-8">
-  <section class="bg-white rounded-2xl shadow-lg border border-slate-100 p-6">
-    <div class="flex items-center justify-between mb-6">
-      <div>
-        <h2 class="text-2xl font-bold">Panel Propietario</h2>
-        <p class="text-slate-500 text-sm">Agenda visitas y genera pases de acceso</p>
-      </div>
-      <span class="px-3 py-1 rounded-full bg-brand-100 text-brand-800 text-sm font-medium">Demo sin login</span>
-    </div>
+<div class="owner-shell soft-grid -mx-4 -my-8 min-h-[calc(100vh-9rem)] px-4 py-8">
+  <div class="mx-auto max-w-6xl space-y-8">
+    <section class="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+      <div><p class="text-xs font-bold uppercase tracking-[.24em] text-brand-700">Resipass by FlowLogic</p><h2 class="mt-2 text-3xl font-black tracking-tight text-slate-900 md:text-4xl">Tu hogar, bajo control.</h2><p class="mt-2 max-w-xl text-slate-500">Administra habitantes y crea accesos temporales desde un solo lugar.</p></div>
+      <form method="get" action="/owner" class="w-full md:w-80"><label for="property_id" class="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-500">Propiedad activa</label><select id="property_id" name="property_id" onchange="this.form.submit()" class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100">{% for prop in properties %}<option value="{{ prop.id }}" {% if prop.id == selected_property.id %}selected{% endif %}>{{ prop.unit }} · {{ prop.name }}</option>{% endfor %}</select></form>
+    </section>
 
-    <form method="get" action="/owner" class="mb-6">
-      <label class="block text-sm font-medium text-slate-700 mb-2">Seleccionar propiedad</label>
-      <select name="property_id" onchange="this.form.submit()"
-              class="w-full rounded-xl border border-slate-300 px-4 py-3 focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
-        {% for prop in properties %}
-        <option value="{{ prop.id }}" {% if prop.id == selected_property.id %}selected{% endif %}>
-          {{ prop.name }} ({{ prop.unit }}) — {{ prop.owner_name }}
-        </option>
-        {% endfor %}
-      </select>
-    </form>
+    <section class="grid gap-5 md:grid-cols-3">
+      <article class="rounded-2xl bg-slate-950 p-6 text-white shadow-lg md:col-span-2"><div class="flex items-start justify-between gap-4"><div><p class="text-sm text-slate-400">Administradora de casa</p><h3 class="mt-1 text-2xl font-bold">{{ selected_property.owner_name }}</h3><p class="mt-2 text-sm text-slate-400">{{ selected_property.name }} · Unidad {{ selected_property.unit }}</p></div><div class="rounded-xl bg-white/10 p-3 text-brand-300" aria-hidden="true">⌂</div></div><div class="mt-8 flex items-end justify-between gap-6"><div><p class="text-xs font-bold uppercase tracking-wider text-slate-400">Capacidad del hogar</p><p class="mt-1 text-3xl font-black">{{ habitants_count }}<span class="text-lg font-medium text-slate-500"> / 4</span></p></div><div class="w-1/2 max-w-xs"><div class="h-2 overflow-hidden rounded-full bg-white/10"><div class="h-full rounded-full bg-gradient-to-r from-cyan-400 to-brand-500" style="width: {{ [habitants_count * 25, 100]|min }}%"></div></div><p class="mt-2 text-right text-xs text-slate-400">Habitantes registrados</p></div></div></article>
+      <article class="rounded-2xl border border-slate-200 bg-white p-6 shadow-lg"><div class="flex items-center justify-between"><p class="text-sm font-bold text-slate-500">Estado de cuenta</p><span class="h-3 w-3 rounded-full {% if selected_property.es_solvente %}bg-emerald-500{% else %}bg-rose-500{% endif %}"></span></div>{% if selected_property.es_solvente %}<p class="mt-6 text-2xl font-black text-emerald-700">Al día</p><p class="mt-2 text-sm text-slate-500">Puedes generar pases de acceso.</p>{% else %}<p class="mt-6 text-2xl font-black text-rose-700">Saldo pendiente</p><p class="mt-2 text-sm text-slate-500">La generación de pases está suspendida.</p>{% endif %}</article>
+    </section>
 
-    <form method="post" action="/owner/visits" class="space-y-4">
-      <input type="hidden" name="property_id" value="{{ selected_property.id }}">
+    <section class="grid gap-6 lg:grid-cols-[.9fr_1.1fr]">
+      <article class="rounded-2xl border border-slate-200 bg-white p-6 shadow-lg"><div class="flex items-start justify-between gap-4"><div><p class="text-xs font-bold uppercase tracking-wider text-brand-600">Personas autorizadas</p><h3 class="mt-1 text-xl font-bold text-slate-900">Habitantes del hogar</h3></div><button type="button" onclick="openInviteModal()" class="rounded-xl bg-gradient-to-r from-brand-600 to-brand-700 px-4 py-2 text-sm font-bold text-white shadow-md transition-all duration-200 hover:scale-105">+ Invitar</button></div><div class="mt-6 space-y-3">{% for inhabitant in inhabitants %}<div class="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3"><div class="flex h-10 w-10 items-center justify-center rounded-full bg-brand-100 font-bold text-brand-700">{{ inhabitant.name[:1]|upper }}</div><div class="min-w-0"><p class="truncate font-semibold text-slate-800">{{ inhabitant.name }}</p><p class="text-xs text-slate-500">{{ inhabitant.role }} · {{ inhabitant.cedula }}</p></div>{% if inhabitant.id == selected_property.owner_id %}<span class="ml-auto rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-bold uppercase text-emerald-700">Titular</span>{% endif %}</div>{% else %}<p class="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">No hay habitantes registrados.</p>{% endfor %}</div></article>
 
-      <div>
-        <label class="block text-sm font-medium text-slate-700 mb-1">Nombre del visitante</label>
-        <input type="text" name="visitor_name" required placeholder="Ej. Juan Pérez"
-               class="w-full rounded-xl border border-slate-300 px-4 py-3 focus:ring-2 focus:ring-brand-500">
-      </div>
+      <article class="rounded-2xl border border-slate-200 bg-white p-6 shadow-lg"><div class="mb-6"><p class="text-xs font-bold uppercase tracking-wider text-brand-600">Acceso temporal</p><h3 class="mt-1 text-xl font-bold text-slate-900">Generar pase de visita</h3></div>{% if not selected_property.es_solvente %}<div class="mb-5 flex gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800"><span class="text-lg">!</span><div><p class="font-bold">Generación suspendida</p><p class="mt-1">Esta propiedad tiene un saldo pendiente. Regulariza tu cuenta para crear nuevos pases.</p></div></div>{% endif %}<form method="post" action="/owner/visits" class="space-y-4 {% if not selected_property.es_solvente %}pointer-events-none opacity-45{% endif %}"><input type="hidden" name="property_id" value="{{ selected_property.id }}"><div class="grid gap-4 sm:grid-cols-2"><label class="block"><span class="mb-2 block text-sm font-semibold text-slate-700">Nombre del visitante</span><input name="visitor_name" required placeholder="Ej. Juan Pérez" class="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100"></label><label class="block"><span class="mb-2 block text-sm font-semibold text-slate-700">Cédula / ID</span><input name="visitor_id" required placeholder="Ej. V-12345678" class="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100"></label></div><div class="grid gap-4 sm:grid-cols-2"><label class="block"><span class="mb-2 block text-sm font-semibold text-slate-700">Tipo de acceso</span><select name="access_type" class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-brand-500"><option value="peatonal">Peatonal</option><option value="vehicular">Vehicular</option></select></label><label class="block"><span class="mb-2 block text-sm font-semibold text-slate-700">Fecha y hora</span><input type="datetime-local" name="scheduled_at" required value="{{ now_iso }}" class="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-brand-500"></label></div><button type="submit" class="w-full rounded-xl bg-gradient-to-r from-brand-600 to-cyan-600 py-3 font-bold text-white shadow-md transition-all duration-200 hover:scale-[1.02] hover:shadow-lg">Generar pase digital</button></form></article>
+    </section>
 
-      <div>
-        <label class="block text-sm font-medium text-slate-700 mb-1">Cédula / ID</label>
-        <input type="text" name="visitor_id" required placeholder="Ej. V-12345678"
-               class="w-full rounded-xl border border-slate-300 px-4 py-3 focus:ring-2 focus:ring-brand-500">
-      </div>
+    <section id="pass-card" class="{% if not request.query_params.get('created') %}hidden{% endif %} overflow-hidden rounded-2xl bg-gradient-to-br from-brand-900 via-slate-900 to-slate-950 text-white shadow-xl"><div class="grid gap-0 md:grid-cols-[1fr_240px]"><div class="p-6 md:p-8"><div class="flex items-center justify-between"><p class="text-xs font-bold uppercase tracking-[.2em] text-cyan-300">Pase digital · Resipass</p><span class="rounded-full bg-emerald-400/15 px-3 py-1 text-xs font-bold text-emerald-300">Activo</span></div><h3 id="pass-visitor" class="mt-8 text-3xl font-black">Pase listo</h3><p id="pass-details" class="mt-2 text-slate-300">Comparte este acceso con tu visitante.</p><div class="mt-8"><p class="text-xs uppercase tracking-wider text-slate-400">Código de acceso</p><p id="pass-code" class="mt-1 font-mono text-5xl font-black tracking-[.18em] text-white">{{ request.query_params.get('created', '') }}</p></div></div><div class="pass-perforation flex flex-col items-center justify-center border-t border-white/10 bg-white p-6 text-center text-slate-900 md:border-l md:border-t-0"><div id="qrcode" class="rounded-xl bg-white p-2"></div><p class="mt-3 text-xs font-semibold text-slate-500">Presenta este QR en garita</p></div></div></section>
 
-      <div class="grid sm:grid-cols-2 gap-4">
-        <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">Tipo de acceso</label>
-          <select name="access_type" required
-                  class="w-full rounded-xl border border-slate-300 px-4 py-3 focus:ring-2 focus:ring-brand-500">
-            <option value="peatonal">Peatonal</option>
-            <option value="vehicular">Vehicular</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">Fecha y hora estimada</label>
-          <input type="datetime-local" name="scheduled_at" required value="{{ now_iso }}"
-                 class="w-full rounded-xl border border-slate-300 px-4 py-3 focus:ring-2 focus:ring-brand-500">
-        </div>
-      </div>
-
-      <button type="submit"
-              class="w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold py-3 rounded-xl transition shadow-md">
-        Generar pase de acceso
-      </button>
-    </form>
-  </section>
-
-  <section class="space-y-6">
-    <div id="pass-card" class="hidden bg-gradient-to-br from-brand-700 to-brand-900 text-white rounded-2xl shadow-xl p-6">
-      <p class="text-brand-100 text-sm uppercase tracking-widest mb-2">Pase generado</p>
-      <h3 class="text-2xl font-bold mb-1" id="pass-visitor"></h3>
-      <p class="text-brand-100 mb-4" id="pass-details"></p>
-      <div class="bg-white rounded-xl p-4 flex flex-col items-center">
-        <p class="text-3xl font-black text-brand-900 tracking-widest mb-3" id="pass-code"></p>
-        <div id="qrcode" class="p-2 bg-white rounded-lg"></div>
-      </div>
-      <p class="text-brand-100 text-xs mt-4 text-center">Comparte este código o QR con tu visitante</p>
-    </div>
-
-    <div class="bg-white rounded-2xl shadow-lg border border-slate-100 p-6">
-      <h3 class="text-xl font-bold mb-4">Visitas agendadas</h3>
-      {% if visits %}
-      <div class="space-y-3 max-h-[32rem] overflow-y-auto">
-        {% for visit in visits %}
-        <article class="rounded-xl border border-slate-200 p-4 hover:border-brand-300 transition">
-          <div class="flex items-start justify-between gap-3">
-            <div>
-              <p class="font-semibold">{{ visit.visitor_name }}</p>
-              <p class="text-sm text-slate-500">{{ visit.visitor_id }} · {{ visit.access_type.value|capitalize }}</p>
-              <p class="text-sm text-slate-500">{{ visit.scheduled_at.strftime('%d/%m/%Y %H:%M') }}</p>
-            </div>
-            <div class="text-right">
-              <span class="inline-block font-mono font-bold text-brand-700 bg-brand-50 px-2 py-1 rounded">{{ visit.code }}</span>
-              <p class="text-xs mt-1
-                {% if visit.status.value == 'scheduled' %}text-amber-600
-                {% elif visit.status.value == 'inside' %}text-emerald-600
-                {% elif visit.status.value == 'exited' %}text-slate-500
-                {% else %}text-red-600{% endif %}">
-                {% if visit.status.value == 'scheduled' %}Agendada
-                {% elif visit.status.value == 'inside' %}Dentro
-                {% elif visit.status.value == 'exited' %}Salió
-                {% else %}Cancelada{% endif %}
-              </p>
-            </div>
-          </div>
-        </article>
-        {% endfor %}
-      </div>
-      {% else %}
-      <p class="text-slate-500 text-sm">No hay visitas registradas para esta propiedad.</p>
-      {% endif %}
-    </div>
-  </section>
+    <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-lg"><div class="flex items-center justify-between"><div><p class="text-xs font-bold uppercase tracking-wider text-brand-600">Actividad reciente</p><h3 class="mt-1 text-xl font-bold text-slate-900">Visitas programadas</h3></div><span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">{{ visits|length }} registros</span></div><div class="mt-5 grid gap-3 md:grid-cols-2">{% for visit in visits %}<article class="flex items-center justify-between gap-4 rounded-xl border border-slate-100 p-4 transition hover:border-brand-200 hover:shadow-md"><div><p class="font-bold text-slate-800">{{ visit.visitor_name }}</p><p class="mt-1 text-xs text-slate-500">{{ visit.visitor_id }} · {{ visit.scheduled_at.strftime('%d/%m/%Y %H:%M') }}</p></div><div class="text-right"><p class="font-mono font-black text-brand-700">{{ visit.code }}</p><p class="mt-1 text-xs font-semibold {% if visit.status.value == 'scheduled' %}text-amber-600{% elif visit.status.value == 'inside' %}text-emerald-600{% else %}text-slate-500{% endif %}">{% if visit.status.value == 'scheduled' %}Agendada{% elif visit.status.value == 'inside' %}Dentro{% elif visit.status.value == 'exited' %}Salió{% else %}Cancelada{% endif %}</p></div></article>{% else %}<p class="py-6 text-sm text-slate-500">Aún no hay visitas para esta propiedad.</p>{% endfor %}</div></section>
+  </div>
 </div>
+
+<div id="invite-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/60 p-4"><div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"><div class="flex items-start justify-between"><div><p class="text-xs font-bold uppercase tracking-wider text-brand-600">Nuevo habitante</p><h3 class="mt-1 text-xl font-bold">Invitar a tu hogar</h3></div><button type="button" onclick="closeInviteModal()" class="text-2xl text-slate-400 hover:text-slate-700" aria-label="Cerrar">×</button></div><form id="invite-form" class="mt-6 space-y-4"><label class="block"><span class="mb-2 block text-sm font-semibold">Nombre completo</span><input id="invite-name" required class="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-brand-500"></label><label class="block"><span class="mb-2 block text-sm font-semibold">Cédula / ID</span><input id="invite-id" required class="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-brand-500"></label><p id="invite-error" class="hidden rounded-lg bg-rose-50 p-3 text-sm text-rose-700"></p><button class="w-full rounded-xl bg-slate-950 py-3 font-bold text-white transition-all duration-200 hover:scale-[1.02]">Enviar invitación</button></form></div></div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-  (function () {
-    const params = new URLSearchParams(window.location.search);
-    const createdCode = params.get('created');
-    if (!createdCode) return;
-
-    fetch('/api/visits/search?code=' + encodeURIComponent(createdCode))
-      .then(function (res) {
-        if (!res.ok) throw new Error('No se pudo cargar el pase');
-        return res.json();
-      })
-      .then(function (visit) {
-        document.getElementById('pass-card').classList.remove('hidden');
-        document.getElementById('pass-visitor').textContent = visit.visitor_name;
-        document.getElementById('pass-details').textContent =
-          visit.access_type_label + ' · ' + visit.scheduled_at_display + ' · ' + visit.property_name;
-        document.getElementById('pass-code').textContent = visit.code;
-
-        new QRCode(document.getElementById('qrcode'), {
-          text: visit.code,
-          width: 180,
-          height: 180,
-          colorDark: '#1e3a8a',
-          colorLight: '#ffffff',
-          correctLevel: QRCode.CorrectLevel.H
-        });
-
-        document.getElementById('pass-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
-      })
-      .catch(function () {
-        console.error('Error al mostrar el pase generado');
-      });
-  })();
+  function openInviteModal() { document.getElementById('invite-modal').classList.remove('hidden'); document.getElementById('invite-modal').classList.add('flex'); }
+  function closeInviteModal() { document.getElementById('invite-modal').classList.add('hidden'); document.getElementById('invite-modal').classList.remove('flex'); }
+  document.getElementById('invite-form').addEventListener('submit', async function (event) { event.preventDefault(); const error = document.getElementById('invite-error'); error.classList.add('hidden'); const response = await fetch('/api/v1/usuarios/vivienda/invitar?propiedad_id={{ selected_property.id }}&usuario_autorizador_id={{ selected_property.owner_id or 0 }}', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nombre: document.getElementById('invite-name').value, cedula: document.getElementById('invite-id').value }) }); if (!response.ok) { const payload = await response.json().catch(() => ({})); error.textContent = payload.detail || 'No se pudo registrar al habitante.'; error.classList.remove('hidden'); return; } window.location.reload(); });
+  const code = new URLSearchParams(window.location.search).get('created'); if (code) { fetch('/api/pases/search?codigo=' + encodeURIComponent(code)).then(function (response) { return response.ok ? response.json() : null; }).then(function (visit) { if (!visit) return; document.getElementById('pass-visitor').textContent = visit.visitante_nombre; document.getElementById('pass-details').textContent = visit.visitante_cedula + ' · Pase activo'; }).catch(function () { console.error('No se pudo cargar el pase generado'); }); if (window.QRCode) { new QRCode(document.getElementById('qrcode'), { text: code, width: 150, height: 150, colorDark: '#172554', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.H }); } document.getElementById('pass-card').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
 </script>
 {% endblock %}
