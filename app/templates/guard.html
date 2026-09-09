@@ -15,6 +15,7 @@
 {% endblock %}
 
 {% block content %}
+<div class="mx-auto max-w-6xl px-4 py-8">
 <div class="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
   <div>
     <h2 class="text-3xl font-black text-emerald-900">Panel de Garita</h2>
@@ -57,31 +58,21 @@
       <span id="expected-count" class="text-3xl font-black text-amber-600">{{ expected_visits|length }}</span>
     </div>
     <div id="expected-list" class="space-y-3">
-      {% for visit in expected_visits %}
-      <article class="visit-card rounded-xl border-2 border-amber-100 bg-amber-50 p-4" data-visit-id="{{ visit.id }}">
-        <div class="flex justify-between items-start gap-3">
-          <div>
-            <p class="text-lg font-bold">{{ visit.visitor_name }}</p>
-            <p class="text-slate-600">{{ visit.propiedad.condominio.nombre if visit.propiedad.condominio else 'Propiedad' }} ({{ visit.propiedad.numero_unidad }})</p>
-            <p class="text-sm text-slate-500">{{ visit.created_at.strftime('%H:%M') }} · Peatonal</p>
-          </div>
-          <span class="font-mono text-xl font-black text-amber-800">{{ visit.code }}</span>
+      <!-- Skeleton placeholders while /api/pases/today resolves -->
+      <div class="skeleton-card animate-pulse rounded-xl border-2 border-amber-100 bg-amber-50/60 p-4">
+        <div class="flex items-start justify-between gap-3">
+          <div class="w-full space-y-2"><div class="h-5 w-40 rounded bg-amber-200/70"></div><div class="h-4 w-52 rounded bg-amber-200/50"></div><div class="h-3 w-28 rounded bg-amber-200/40"></div></div>
+          <div class="h-6 w-20 rounded bg-amber-200/70"></div>
         </div>
-        <div class="mt-4 flex gap-3">
-          {% if visit.estado == 'PENDIENTE' %}
-              <button onclick="markEntry({{ visit.id }})"
-                  class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-lg font-bold py-3 rounded-xl transition">
-            Marcar Entrada
-          </button>
-          {% else %}
-              <button onclick="markExit({{ visit.id }})"
-                  class="flex-1 bg-red-600 hover:bg-red-700 text-white text-lg font-bold py-3 rounded-xl transition">
-            Marcar Salida
-          </button>
-          {% endif %}
+        <div class="mt-4 h-11 w-full rounded-xl bg-amber-200/50"></div>
+      </div>
+      <div class="skeleton-card animate-pulse rounded-xl border-2 border-amber-100 bg-amber-50/60 p-4">
+        <div class="flex items-start justify-between gap-3">
+          <div class="w-full space-y-2"><div class="h-5 w-32 rounded bg-amber-200/70"></div><div class="h-4 w-44 rounded bg-amber-200/50"></div><div class="h-3 w-24 rounded bg-amber-200/40"></div></div>
+          <div class="h-6 w-20 rounded bg-amber-200/70"></div>
         </div>
-      </article>
-      {% endfor %}
+        <div class="mt-4 h-11 w-full rounded-xl bg-amber-200/50"></div>
+      </div>
     </div>
   </section>
 
@@ -91,31 +82,27 @@
       <span id="inside-count" class="text-3xl font-black text-emerald-600">{{ inside_visits|length }}</span>
     </div>
     <div id="inside-list" class="space-y-3">
-      {% for visit in inside_visits %}
-      <article class="visit-card rounded-xl border-2 border-emerald-100 bg-emerald-50 p-4" data-visit-id="{{ visit.id }}">
-        <div class="flex justify-between items-start gap-3">
-          <div>
-            <p class="text-lg font-bold">{{ visit.visitor_name }}</p>
-              <p class="text-slate-600">{{ visit.propiedad.condominio.nombre if visit.propiedad.condominio else 'Propiedad' }} ({{ visit.propiedad.numero_unidad }})</p>
-            <p class="text-sm text-slate-500">
-              Registrado: {{ visit.created_at.strftime('%H:%M') }}
-            </p>
-          </div>
-          <span class="font-mono text-xl font-black text-emerald-800">{{ visit.code }}</span>
+      <!-- Skeleton placeholders while /api/pases/inside resolves -->
+      <div class="skeleton-card animate-pulse rounded-xl border-2 border-emerald-100 bg-emerald-50/60 p-4">
+        <div class="flex items-start justify-between gap-3">
+          <div class="w-full space-y-2"><div class="h-5 w-40 rounded bg-emerald-200/70"></div><div class="h-4 w-52 rounded bg-emerald-200/50"></div><div class="h-3 w-28 rounded bg-emerald-200/40"></div></div>
+          <div class="h-6 w-20 rounded bg-emerald-200/70"></div>
         </div>
-        <div class="mt-4">
-          <button onclick="markExit({{ visit.id }})"
-                  class="w-full bg-red-600 hover:bg-red-700 text-white text-lg font-bold py-3 rounded-xl transition">
-            Marcar Salida
-          </button>
+        <div class="mt-4 h-11 w-full rounded-xl bg-emerald-200/50"></div>
+      </div>
+      <div class="skeleton-card animate-pulse rounded-xl border-2 border-emerald-100 bg-emerald-50/60 p-4">
+        <div class="flex items-start justify-between gap-3">
+          <div class="w-full space-y-2"><div class="h-5 w-32 rounded bg-emerald-200/70"></div><div class="h-4 w-44 rounded bg-emerald-200/50"></div><div class="h-3 w-24 rounded bg-emerald-200/40"></div></div>
+          <div class="h-6 w-20 rounded bg-emerald-200/70"></div>
         </div>
-      </article>
-      {% endfor %}
+        <div class="mt-4 h-11 w-full rounded-xl bg-emerald-200/50"></div>
+      </div>
     </div>
   </section>
 </div>
 
 <div id="toast" class="fixed bottom-6 right-6 hidden px-5 py-4 rounded-xl shadow-2xl text-white font-semibold z-50"></div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -275,6 +262,8 @@
     }
   });
 
+  // Cargar datos reales de inmediato (los esqueletos se muestran hasta que resuelva el fetch)
+  refreshLists();
   setInterval(refreshLists, 15000);
 </script>
 {% endblock %}
