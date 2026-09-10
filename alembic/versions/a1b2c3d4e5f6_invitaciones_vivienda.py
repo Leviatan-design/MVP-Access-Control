@@ -8,6 +8,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 
 revision: str = "a1b2c3d4e5f6"
@@ -17,7 +18,12 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    invitacion_estado = sa.Enum("PENDIENTE", "USADO", name="invitacion_estado")
+    invitacion_estado = postgresql.ENUM(
+        "PENDIENTE",
+        "USADO",
+        name="invitacion_estado",
+        create_type=False,
+    )
     invitacion_estado.create(op.get_bind(), checkfirst=True)
     op.create_table(
         "invitaciones_vivienda",
