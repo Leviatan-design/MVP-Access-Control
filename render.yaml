@@ -13,6 +13,10 @@ services:
           property: connectionString
       - key: PYTHONUNBUFFERED
         value: 1
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: SUPER_ADMIN_PASSWORD
+        generateValue: true
 databases:
   - name: access-pass-db
     databaseName: access_pass

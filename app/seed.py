@@ -1,10 +1,32 @@
 import random
+import os
+import secrets
 import string
 from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session
 
 from app.models import Condominio, Propiedad, Usuario, Pase
+from app.security import hash_password
+
+
+def ensure_super_admin(db: Session) -> None:
+    """Crea el acceso de desarrollo una sola vez, incluso con datos ya existentes."""
+    email = os.environ.get("SUPER_ADMIN_EMAIL", "dev@flowlogic.com").strip().lower()
+    if db.query(Usuario).filter(Usuario.email == email).first():
+        return
+
+    password = os.environ.get("SUPER_ADMIN_PASSWORD") or secrets.token_urlsafe(24)
+    db.add(Usuario(
+        propiedad_id=None,
+        nombre="Administrador de Desarrollo",
+        email=email,
+        cedula="SUPER-ADMIN-001",
+        password_hash=hash_password(password),
+        rol="SUPER_ADMIN",
+    ))
+    db.commit()
+    print(f"SUPER_ADMIN inicial creado: {email} | contraseña: {password}")
 
 
 def generate_code(db: Session) -> str:
@@ -20,6 +42,7 @@ def generate_code(db: Session) -> str:
 
 def seed_database(db: Session) -> None:
     """Inicializa la base de datos con datos de ejemplo."""
+    ensure_super_admin(db)
     # Solo sembrar si no hay datos
     if db.query(Condominio).count() > 0:
         return
@@ -58,27 +81,26 @@ def seed_database(db: Session) -> None:
         Usuario(
             propiedad_id=propiedades[0].id,
             nombre="María González",
+            email="maria.gonzalez@example.com",
             cedula="V-12345678",
-            rol="ADMIN_CASA"
+            password_hash=hash_password("Demo-FlowLogic-2026!"),
+            rol="ADMIN_CASA",
         ),
         Usuario(
             propiedad_id=propiedades[1].id,
             nombre="Carlos Ruiz",
+            email="carlos.ruiz@example.com",
             cedula="V-87654321",
-            rol="ADMIN_CASA"
+            password_hash=hash_password("Demo-FlowLogic-2026!"),
+            rol="ADMIN_CASA",
         ),
         Usuario(
             propiedad_id=propiedades[2].id,
             nombre="Ana Martínez",
+            email="ana.martinez@example.com",
             cedula="V-99887766",
-            rol="ADMIN_CASA"
-        ),
-        # Super admin
-        Usuario(
-            propiedad_id=None,
-            nombre="Admin Principal",
-            cedula="ADMIN-001",
-            rol="SUPER_ADMIN"
+            password_hash=hash_password("Demo-FlowLogic-2026!"),
+            rol="ADMIN_CASA",
         ),
     ]
     db.add_all(usuarios)
@@ -89,14 +111,18 @@ def seed_database(db: Session) -> None:
         Usuario(
             propiedad_id=propiedades[0].id,
             nombre="Juan González",
+            email="juan.gonzalez@example.com",
             cedula="V-12345679",
-            rol="COHABITANTE"
+            password_hash=hash_password("Demo-FlowLogic-2026!"),
+            rol="COHABITANTE",
         ),
         Usuario(
             propiedad_id=propiedades[1].id,
             nombre="Laura Ruiz",
+            email="laura.ruiz@example.com",
             cedula="V-87654322",
-            rol="COHABITANTE"
+            password_hash=hash_password("Demo-FlowLogic-2026!"),
+            rol="COHABITANTE",
         ),
     ]
     db.add_all(cohabitantes)

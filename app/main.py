@@ -7,10 +7,11 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.database import SessionLocal, get_db
 from app.controller import MorosidadController, PropiedadController, UsuarioController
@@ -19,6 +20,8 @@ from app.routes.usuarios import router as usuarios_router
 from app.routes.pases import router as pases_router
 from app.routes.condominios import router as condominios_router
 from app.routes.propiedades import router as propiedades_router
+from app.routes.auth import router as auth_router
+from app.routes.anuncios import router as anuncios_router
 from app.seed import seed_database
 from app.seed import generate_code
 
@@ -78,6 +81,15 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
         request.url.path,
         exc,
     )
+
+
+@app.middleware("http")
+async def log_unhandled_exceptions(request: Request, call_next):
+    try:
+        return await call_next(request)
+    except Exception:
+        logger.exception("Unhandled exception in HTTP middleware for %s %s", request.method, request.url.path)
+        raise
     return JSONResponse(
         status_code=500,
         content={"detail": "Internal Server Error", "path": request.url.path},
@@ -88,6 +100,8 @@ app.include_router(usuarios_router)
 app.include_router(pases_router)
 app.include_router(condominios_router)
 app.include_router(propiedades_router)
+app.include_router(auth_router)
+app.include_router(anuncios_router)
 
 
 def pase_to_dict(pase: Pase) -> dict:
@@ -155,6 +169,15 @@ def health() -> dict:
     return {"status": "ok", "service": "access-control"}
 
 
+@app.get("/sw.js", include_in_schema=False)
+def service_worker() -> FileResponse:
+    return FileResponse(
+        BASE_DIR / "static" / "sw.js",
+        media_type="application/javascript",
+        headers={"Service-Worker-Allowed": "/"},
+    )
+
+
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
     property_count = db.query(Propiedad).count()
@@ -185,53 +208,73 @@ def owner_panel(
     db: Session = Depends(get_db),
 ) -> HTMLResponse:
     """Renderiza el panel con propiedades, habitantes y pases."""
-    properties = db.query(Propiedad).options(joinedload(Propiedad.condominio)).order_by(Propiedad.id).all()
-    if not properties:
-        raise HTTPException(status_code=404, detail="No hay propiedades registradas")
+    try:
+        properties = (
+            db.query(Propiedad)
+            .options(joinedload(Propiedad.condominio), selectinload(Propiedad.usuarios))
+            .order_by(Propiedad.id)
+            .all()
+        )
+        if not properties:
+            raise HTTPException(status_code=404, detail="No hay propiedades registradas")
 
-    selected_model = next((item for item in properties if item.id == property_id), properties[0])
-    owner = next((user for user in selected_model.usuarios if user.rol == "ADMIN_CASA"), None)
-    selected_property = OwnerProperty(
-        id=selected_model.id,
-        name=selected_model.condominio.nombre if selected_model.condominio else "Propiedad",
-        unit=selected_model.numero_unidad,
-        owner_name=owner.nombre if owner else "Propietario no registrado",
-        owner_id=owner.id if owner else None,
-        es_solvente=selected_model.es_solvente,
-    )
-    inhabitants = [
-        OwnerResident(
-            id=user.id,
-            name=user.nombre,
-            cedula=user.cedula,
-            role="Administrador de casa" if user.rol == "ADMIN_CASA" else "Co-habitante",
+        if property_id is None:
+            selected_model = properties[0]
+        else:
+            selected_model = next((item for item in properties if item.id == property_id), None)
+            if selected_model is None:
+                raise HTTPException(status_code=404, detail="Propiedad no encontrada")
+
+        owner = next((user for user in selected_model.usuarios if user.rol == "ADMIN_CASA"), None)
+        selected_property = OwnerProperty(
+            id=selected_model.id,
+            name=selected_model.condominio.nombre if selected_model.condominio else "Propiedad",
+            unit=selected_model.numero_unidad,
+            owner_name=owner.nombre if owner else "Propietario no registrado",
+            owner_id=owner.id if owner else None,
+            es_solvente=selected_model.es_solvente,
         )
-        for user in selected_model.usuarios
-        if user.rol in {"ADMIN_CASA", "COHABITANTE"}
-    ]
-    pases = db.query(Pase).filter(Pase.propiedad_id == selected_model.id).order_by(Pase.created_at.desc()).all()
-    visits = [
-        OwnerVisit(
-            visitor_name=pase.visitante_nombre,
-            visitor_id=pase.visitante_cedula,
-            access_type=OwnerAccessType.PEATONAL,
-            scheduled_at=pase.created_at,
-            code=pase.codigo,
-            status={"PENDIENTE": OwnerVisitStatus.SCHEDULED, "DENTRO": OwnerVisitStatus.INSIDE, "FINALIZADO": OwnerVisitStatus.EXITED}.get(pase.estado, OwnerVisitStatus.CANCELLED),
+        inhabitants = [
+            OwnerResident(
+                id=user.id,
+                name=user.nombre,
+                cedula=user.cedula,
+                role="Administrador de casa" if user.rol == "ADMIN_CASA" else "Co-habitante",
+            )
+            for user in selected_model.usuarios
+            if user.rol in {"ADMIN_CASA", "COHABITANTE"}
+        ]
+        pases = db.query(Pase).filter(Pase.propiedad_id == selected_model.id).order_by(Pase.created_at.desc()).all()
+        visits = [
+            OwnerVisit(
+                visitor_name=pase.visitante_nombre,
+                visitor_id=pase.visitante_cedula,
+                access_type=OwnerAccessType.PEATONAL,
+                scheduled_at=pase.created_at,
+                code=pase.codigo,
+                status={"PENDIENTE": OwnerVisitStatus.SCHEDULED, "DENTRO": OwnerVisitStatus.INSIDE, "FINALIZADO": OwnerVisitStatus.EXITED}.get(pase.estado, OwnerVisitStatus.CANCELLED),
+            )
+            for pase in pases
+        ]
+        property_views = []
+        for item in properties:
+            item_owner = next((user for user in item.usuarios if user.rol == "ADMIN_CASA"), None)
+            property_views.append(OwnerProperty(
+                id=item.id,
+                name=item.condominio.nombre if item.condominio else "Propiedad",
+                unit=item.numero_unidad,
+                owner_name=item_owner.nombre if item_owner else "Propietario no registrado",
+                owner_id=item_owner.id if item_owner else None,
+                es_solvente=item.es_solvente,
+            ))
+    except SQLAlchemyError as exc:
+        db.rollback()
+        logger.exception("Database error while rendering /owner")
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "No se pudo cargar el panel del propietario"},
         )
-        for pase in pases
-    ]
-    property_views = []
-    for item in properties:
-        item_owner = next((user for user in item.usuarios if user.rol == "ADMIN_CASA"), None)
-        property_views.append(OwnerProperty(
-            id=item.id,
-            name=item.condominio.nombre if item.condominio else "Propiedad",
-            unit=item.numero_unidad,
-            owner_name=item_owner.nombre if item_owner else "Propietario no registrado",
-            owner_id=item_owner.id if item_owner else None,
-            es_solvente=item.es_solvente,
-        ))
+
     return templates.TemplateResponse("owner.html", {
         "request": request,
         "properties": property_views,

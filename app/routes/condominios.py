@@ -3,29 +3,18 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.schemas import MorosidadCSVResponse
-from app.controller import MorosidadController, UsuarioController
+from app.controller import MorosidadController
+from app.models import UserRole, Usuario
+from app.security import require_role
 
 router = APIRouter(prefix="/api/v1/condominio", tags=["condominios"])
-
-
-def verificar_super_admin(usuario_id: int, db: Session) -> None:
-    """
-    Verifica que el usuario tenga rol SUPER_ADMIN.
-    Lanza HTTPException 403 si no es SUPER_ADMIN.
-    """
-    usuario = UsuarioController.obtener_usuario_por_id(db, usuario_id)
-    if usuario.rol != "SUPER_ADMIN":
-        raise HTTPException(
-            status_code=403,
-            detail="Solo usuarios con rol SUPER_ADMIN pueden realizar esta acción"
-        )
 
 
 @router.post("/morosidad/cargar-csv", response_model=MorosidadCSVResponse)
 async def cargar_csv_morosidad(
     file: UploadFile = File(...),
-    usuario_id: int = 1,  # TODO: Implementar autenticación real
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_role([UserRole.SUPER_ADMIN, UserRole.ADMIN_CONDOMINIO]))
 ):
     """
     Endpoint protegido para SUPER_ADMIN para cargar archivo CSV de morosidad.
@@ -43,9 +32,6 @@ async def cargar_csv_morosidad(
     - yes/no
     - y/n
     """
-    # Verificar que el usuario sea SUPER_ADMIN
-    verificar_super_admin(usuario_id, db)
-
     # Validar que sea un archivo CSV
     if not file.filename.endswith('.csv'):
         raise HTTPException(
@@ -69,16 +55,13 @@ async def cargar_csv_morosidad(
 
 @router.get("/morosidad/propiedades")
 def obtener_propiedades_morosidad(
-    usuario_id: int = 1,  # TODO: Implementar autenticación real
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_role([UserRole.SUPER_ADMIN, UserRole.ADMIN_CONDOMINIO]))
 ):
     """
     Obtiene el estado de morosidad de todas las propiedades.
     Solo accesible para SUPER_ADMIN.
     """
-    # Verificar que el usuario sea SUPER_ADMIN
-    verificar_super_admin(usuario_id, db)
-
     from app.models import Propiedad
     from sqlalchemy.orm import joinedload
 

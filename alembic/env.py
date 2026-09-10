@@ -28,9 +28,13 @@ target_metadata = Base.metadata
 
 
 def database_url() -> str:
-    url = os.environ.get("DATABASE_URL", config.get_main_option("sqlalchemy.url"))
+    url = os.environ.get("DATABASE_URL")
+    if not url:
+        raise RuntimeError("DATABASE_URL es obligatorio y debe apuntar a PostgreSQL")
     if url.startswith("postgres://"):
-        return "postgresql://" + url[len("postgres://"):]
+        url = "postgresql://" + url[len("postgres://"):]
+    if not url.startswith("postgresql"):
+        raise RuntimeError("DATABASE_URL debe usar el dialecto postgresql://")
     return url
 
 # other values from the config, defined by the needs of env.py,

@@ -1,15 +1,21 @@
-from pydantic import BaseModel, Field, validator
+from datetime import datetime
+from decimal import Decimal
+from typing import Literal, Optional
+
+from pydantic import BaseModel, EmailStr, Field, validator
 
 
 # Valid roles constant
-VALID_ROLES = {"SUPER_ADMIN", "ADMIN_CASA", "COHABITANTE", "VIGILANTE"}
+VALID_ROLES = {"SUPER_ADMIN", "ADMIN_CONDOMINIO", "ADMIN_CASA", "COHABITANTE", "VIGILANTE"}
 
 
 class UsuarioCreate(BaseModel):
     nombre: str = Field(..., min_length=1, max_length=200)
+    email: EmailStr
     cedula: str = Field(..., min_length=1, max_length=20)
-    propiedad_id: int
+    propiedad_id: Optional[int]
     rol: str = Field(..., description="Rol del usuario")
+    password: str = Field(..., min_length=12, max_length=128)
 
     @validator("rol")
     def validate_role(cls, v):
@@ -21,8 +27,9 @@ class UsuarioCreate(BaseModel):
 class UsuarioResponse(BaseModel):
     id: int
     nombre: str
+    email: EmailStr
     cedula: str
-    propiedad_id: int
+    propiedad_id: Optional[int]
     rol: str
 
     class Config:
@@ -31,18 +38,39 @@ class UsuarioResponse(BaseModel):
 
 class CoHabitanteInvitacion(BaseModel):
     nombre: str = Field(..., min_length=1, max_length=200)
+    email: EmailStr
     cedula: str = Field(..., min_length=1, max_length=20)
+    password: str = Field(..., min_length=12, max_length=128)
+
+
+class InvitacionRegistro(BaseModel):
+    token_invitacion: str = Field(..., min_length=1, max_length=128)
+    nombre: str = Field(..., min_length=1, max_length=200)
+    cedula: str = Field(..., min_length=1, max_length=20)
+    email: EmailStr
+    password: str = Field(..., min_length=12, max_length=128)
+
+
+class InvitacionResponse(BaseModel):
+    token_invitacion: str
+    expira_en: str
 
 
 class CoHabitanteResponse(BaseModel):
     id: int
     nombre: str
+    email: EmailStr
     cedula: str
     propiedad_id: int
     rol: str
 
     class Config:
         from_attributes = True
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str
 
 
 class PaseCreate(BaseModel):
@@ -65,6 +93,16 @@ class PaseResponse(BaseModel):
         from_attributes = True
 
 
+class OfflineSyncAction(BaseModel):
+    pase_id: int = Field(..., gt=0)
+    accion: Literal["entrada", "salida"]
+    timestamp: datetime
+
+
+class OfflineSyncResponse(BaseModel):
+    synced_ids: list[int] = Field(default_factory=list)
+
+
 class MorosidadCSVResponse(BaseModel):
     message: str
     propiedades_actualizadas: int
@@ -74,6 +112,25 @@ class MorosidadCSVResponse(BaseModel):
 class PropiedadMorosidadUpdate(BaseModel):
     numero_unidad: str
     es_solvente: bool
+
+
+class AnuncioCreate(BaseModel):
+    titulo: str = Field(..., min_length=1, max_length=200)
+    descripcion: str = Field(..., min_length=1, max_length=2000)
+    precio: Optional[Decimal] = Field(default=None, ge=0, max_digits=12, decimal_places=2)
+
+
+class AnuncioResponse(BaseModel):
+    id: int
+    titulo: str
+    descripcion: str
+    precio: Optional[Decimal]
+    autor_id: int
+    fecha_creacion: datetime
+    activo: bool
+
+    class Config:
+        from_attributes = True
 
 
 class ErrorDetail(BaseModel):

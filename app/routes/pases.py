@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
-from app.schemas import PaseCreate, PaseResponse
+from app.schemas import OfflineSyncAction, OfflineSyncResponse, PaseCreate, PaseResponse
 from app.controller import UsuarioController, PropiedadController, MorosidadController
 from app.models import Pase, Usuario
 from app.seed import generate_code
@@ -135,6 +135,42 @@ def registrar_salida(pase_id: int, db: Session = Depends(get_db)):
     db.refresh(pase)
 
     return pase
+
+
+@router.post("/sync-offline", response_model=OfflineSyncResponse)
+def sincronizar_pases_offline(
+    acciones: list[OfflineSyncAction],
+    db: Session = Depends(get_db),
+):
+    """Aplica las acciones acumuladas por el panel de garita en una transacción."""
+    synced_ids = []
+
+    with db.begin():
+        for accion in acciones:
+            pase = (
+                db.query(Pase)
+                .filter(Pase.id == accion.pase_id)
+                .with_for_update()
+                .first()
+            )
+
+            if not pase:
+                raise HTTPException(status_code=404, detail=f"Pase no encontrado: {accion.pase_id}")
+
+            expected_state = "PENDIENTE" if accion.accion == "entrada" else "DENTRO"
+            applied_state = "DENTRO" if accion.accion == "entrada" else "FINALIZADO"
+            if pase.estado == expected_state:
+                pase.estado = applied_state
+            elif pase.estado != applied_state:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"No se puede registrar {accion.accion} para el pase {accion.pase_id}. Estado actual: {pase.estado}",
+                )
+
+            if accion.pase_id not in synced_ids:
+                synced_ids.append(accion.pase_id)
+
+    return OfflineSyncResponse(synced_ids=synced_ids)
 
 
 @router.get("/propiedad/{propiedad_id}", response_model=list[PaseResponse])

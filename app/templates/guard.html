@@ -55,7 +55,7 @@
   <section class="bg-white rounded-2xl shadow-lg border-2 border-amber-200 p-6">
     <div class="flex items-center justify-between mb-4">
       <h3 class="text-2xl font-bold text-amber-900">Esperados hoy</h3>
-      <span id="expected-count" class="text-3xl font-black text-amber-600">{{ expected_visits|length }}</span>
+      <span id="expected-count" class="text-3xl font-black text-amber-600">{{ expected_visits|default([], true)|length }}</span>
     </div>
     <div id="expected-list" class="space-y-3">
       <!-- Skeleton placeholders while /api/pases/today resolves -->
@@ -79,7 +79,7 @@
   <section class="bg-white rounded-2xl shadow-lg border-2 border-emerald-200 p-6">
     <div class="flex items-center justify-between mb-4">
       <h3 class="text-2xl font-bold text-emerald-900">Dentro del conjunto</h3>
-      <span id="inside-count" class="text-3xl font-black text-emerald-600">{{ inside_visits|length }}</span>
+      <span id="inside-count" class="text-3xl font-black text-emerald-600">{{ inside_visits|default([], true)|length }}</span>
     </div>
     <div id="inside-list" class="space-y-3">
       <!-- Skeleton placeholders while /api/pases/inside resolves -->
@@ -123,7 +123,49 @@
     return { scheduled: 'Agendada', inside: 'Dentro', exited: 'Salió', cancelled: 'Cancelada' }[status] || status;
   }
 
+  function getOfflineQueue() {
+    try {
+      return JSON.parse(localStorage.getItem('offline_access_queue') || '[]');
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function saveOfflineAction(id, action) {
+    const queue = getOfflineQueue();
+    queue.push({ pase_id: id, accion: action, timestamp: new Date().toISOString() });
+    localStorage.setItem('offline_access_queue', JSON.stringify(queue));
+    updatePendingUI(id);
+  }
+
+  function pendingActionFor(id) {
+    const action = getOfflineQueue().slice().reverse().find(function (item) {
+      return Number(item.pase_id) === Number(id);
+    });
+    return action ? action.accion : null;
+  }
+
+  function pendingMarkup(action) {
+    return '<span class="text-sm font-semibold text-amber-700">Sincronización pendiente (' + action + ')</span>';
+  }
+
+  function updatePendingUI(id) {
+    const action = pendingActionFor(id);
+    if (!action) return;
+    document.querySelectorAll('[data-visit-id="' + id + '"] .mt-4').forEach(function (container) {
+      container.innerHTML = pendingMarkup(action);
+    });
+    const searchResult = document.getElementById('search-result');
+    if (!searchResult.classList.contains('hidden')) {
+      searchResult.querySelectorAll('.flex.gap-3').forEach(function (container) {
+        container.innerHTML = pendingMarkup(action);
+      });
+    }
+  }
+
   function renderVisitActions(visit) {
+    const pendingAction = pendingActionFor(visit.id);
+    if (pendingAction) return pendingMarkup(pendingAction);
     if (visit.status === 'scheduled') {
       return '<button onclick="markEntry(' + visit.id + ')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-lg font-bold py-3 rounded-xl transition">Marcar Entrada</button>';
     }
@@ -150,7 +192,7 @@
       '<p class="text-slate-600">' + visit.property_name + ' (' + visit.property_unit + ')</p>' +
       '<p class="text-sm text-slate-500">Entrada: ' + (visit.entry_at_display ? visit.entry_at_display.split(' ')[1] : '—') + '</p></div>' +
       '<span class="font-mono text-xl font-black text-emerald-800">' + visit.code + '</span></div>' +
-      '<div class="mt-4"><button onclick="markExit(' + visit.id + ')" class="w-full bg-red-600 hover:bg-red-700 text-white text-lg font-bold py-3 rounded-xl transition">Marcar Salida</button></div></article>';
+      '<div class="mt-4">' + (pendingActionFor(visit.id) ? pendingMarkup(pendingActionFor(visit.id)) : '<button onclick="markExit(' + visit.id + ')" class="w-full bg-red-600 hover:bg-red-700 text-white text-lg font-bold py-3 rounded-xl transition">Marcar Salida</button>') + '</div></article>';
   }
 
   function renderSearchResult(visit) {
@@ -183,28 +225,78 @@
   }
 
   async function markEntry(id) {
-    const res = await fetch('/api/pases/' + id + '/entry', { method: 'POST' });
-    const data = await res.json();
+    if (!navigator.onLine) {
+      saveOfflineAction(id, 'entrada');
+      showToast('Entrada procesada. Sincronización pendiente.', true);
+      return;
+    }
+    let res;
+    try {
+      res = await fetch('/api/v1/pases/' + id + '/entrada', { method: 'PATCH' });
+    } catch (error) {
+      saveOfflineAction(id, 'entrada');
+      showToast('Entrada procesada. Sincronización pendiente.', true);
+      return;
+    }
+    const data = await res.json().catch(function () { return {}; });
     if (!res.ok) {
       showToast(data.detail || 'No se pudo registrar la entrada', false);
       return;
     }
-    showToast('Entrada registrada: ' + data.visitor_name, true);
+    showToast('Entrada registrada: ' + (data.visitante_nombre || data.visitor_name), true);
     await refreshLists();
   }
 
   async function markExit(id) {
-    const res = await fetch('/api/pases/' + id + '/exit', { method: 'POST' });
-    const data = await res.json();
+    if (!navigator.onLine) {
+      saveOfflineAction(id, 'salida');
+      showToast('Salida procesada. Sincronización pendiente.', true);
+      return;
+    }
+    let res;
+    try {
+      res = await fetch('/api/v1/pases/' + id + '/salida', { method: 'PATCH' });
+    } catch (error) {
+      saveOfflineAction(id, 'salida');
+      showToast('Salida procesada. Sincronización pendiente.', true);
+      return;
+    }
+    const data = await res.json().catch(function () { return {}; });
     if (!res.ok) {
       showToast(data.detail || 'No se pudo registrar la salida', false);
       return;
     }
-    showToast('Salida registrada: ' + data.visitor_name, true);
+    showToast('Salida registrada: ' + (data.visitante_nombre || data.visitor_name), true);
     await refreshLists();
   }
 
+  async function syncOfflineData() {
+    if (!navigator.onLine) return;
+    const queue = getOfflineQueue();
+    if (!queue.length) return;
+
+    try {
+      const res = await fetch('/api/v1/pases/sync-offline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(queue)
+      });
+      if (!res.ok) return;
+
+      const data = await res.json();
+      const syncedIds = new Set(data.synced_ids || []);
+      localStorage.setItem('offline_access_queue', JSON.stringify(queue.filter(function (item) {
+        return !syncedIds.has(Number(item.pase_id));
+      })));
+      showToast('Accesos offline sincronizados', true);
+      await refreshLists();
+    } catch (error) {
+      // La cola se conserva para el siguiente evento online.
+    }
+  }
+
   async function refreshLists() {
+    if (!navigator.onLine) return;
     const [expectedRes, insideRes] = await Promise.all([
       fetch('/api/pases/today'),
       fetch('/api/pases/inside')
@@ -261,6 +353,12 @@
       showToast('No se pudo acceder a la cámara', false);
     }
   });
+
+  window.addEventListener('online', syncOfflineData);
+  syncOfflineData();
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js', { scope: '/' });
+  }
 
   // Cargar datos reales de inmediato (los esqueletos se muestran hasta que resuelva el fetch)
   refreshLists();

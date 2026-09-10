@@ -152,13 +152,15 @@ class UsuarioController:
         return db.query(Usuario).filter(Usuario.cedula == cedula).first() is not None
 
     @staticmethod
-    def crear_usuario(db: Session, nombre: str, cedula: str, propiedad_id: int, rol: str) -> Usuario:
+    def crear_usuario(db: Session, nombre: str, email: str, cedula: str, propiedad_id: int, rol: str, password_hash: str) -> Usuario:
         """Crea un nuevo usuario en la base de datos."""
         nuevo_usuario = Usuario(
             nombre=nombre,
+            email=email,
             cedula=cedula,
             propiedad_id=propiedad_id,
-            rol=rol
+            rol=rol,
+            password_hash=password_hash,
         )
         db.add(nuevo_usuario)
         db.commit()

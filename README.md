@@ -6,7 +6,8 @@ Aplicación web full-stack para gestionar visitas en conjuntos residenciales. In
 
 - **Backend:** Python 3.12 + FastAPI + Uvicorn
 - **Frontend:** Jinja2 + TailwindCSS (CDN) + JavaScript nativo
-- **Base de datos:** SQLite con datos semilla automáticos
+- **Base de datos:** PostgreSQL con datos semilla automáticos
+- **Autenticación:** JWT Bearer + bcrypt + roles jerárquicos
 - **Contenedor:** Docker (imagen slim)
 
 ## Funcionalidades
@@ -42,6 +43,16 @@ docker run --rm -p 8080:8080 -e PORT=8080 access-control
 ```
 
 Abre en el navegador: **http://localhost:8080**
+
+### Accesos iniciales
+
+El seeder crea de forma idempotente el siguiente acceso `SUPER_ADMIN`:
+
+| Email | Contraseña | Rol |
+|--------|------------|-----|
+| `dev@flowlogic.com` | `ChangeThis-FlowLogic-2026!` | `SUPER_ADMIN` |
+
+Configura `SUPER_ADMIN_EMAIL`, `SUPER_ADMIN_PASSWORD` y `JWT_SECRET_KEY` como secretos reales antes de cualquier despliegue. El login usa `POST /auth/login` con formulario OAuth2 (`username` = email, `password` = contraseña).
 
 ### Verificar salud
 
@@ -103,7 +114,7 @@ En Linux/macOS usa `export PORT=8080` en lugar de `set PORT=8080`.
 
 ### Notas para Render Free Tier
 
-- El disco es **efímero**: los datos SQLite se reinician en cada redeploy.
+- La base de datos se mantiene en PostgreSQL; el almacenamiento local del contenedor es efímero.
 - El servicio entra en **sleep** tras inactividad (~15 min). La primera petición puede tardar unos segundos.
 - El escaneo QR requiere **HTTPS** (Render lo provee) y permiso de cámara en el navegador.
 
@@ -113,7 +124,7 @@ En Linux/macOS usa `export PORT=8080` en lugar de `set PORT=8080`.
 .
 ├── app/
 │   ├── main.py           # Rutas FastAPI y API REST
-│   ├── database.py       # Configuración SQLite
+│   ├── database.py       # Configuración PostgreSQL
 │   ├── models.py         # Modelos Property y Visit
 │   ├── seed.py           # Datos de prueba
 │   ├── static/           # Archivos estáticos
